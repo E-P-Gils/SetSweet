@@ -29,8 +29,7 @@ export default function CameraZoom(){
     <View style={styles.container}>
       <CameraView style={styles.camera} facing={facing}>
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-            <Text style={styles.text}>Flip Camera</Text>
+          <TouchableOpacity style={styles.button}>
           </TouchableOpacity>
         </View>
       </CameraView>
