@@ -7,12 +7,10 @@ export default function CameraZoom(){
   const [permission, requestPermission] = useCameraPermissions();
 
   if (!permission) {
-    // Camera permissions are still loading.
     return <View />;
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
@@ -21,16 +19,10 @@ export default function CameraZoom(){
     );
   }
 
-  function toggleCameraFacing() {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
-  }
-
   return (
     <View style={styles.container}>
       <CameraView style={styles.camera} facing={facing}>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button}>
-          </TouchableOpacity>
+        <View style={styles.container}>
         </View>
       </CameraView>
     </View>
@@ -38,31 +30,21 @@ export default function CameraZoom(){
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container : {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    margin:200,
   },
+
   message: {
     textAlign: 'center',
     paddingBottom: 10,
   },
   camera: {
     flex: 1,
-  },
-  buttonContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: 'transparent',
-    margin: 64,
-  },
-  button: {
-    flex: 1,
     alignSelf: 'flex-end',
-    alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
-  text: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
+
 });
