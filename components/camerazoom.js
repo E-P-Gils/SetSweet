@@ -1,6 +1,6 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CameraButton, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CameraZoom(){
   const {facing, setFacing} = useState<CameraType>('back');
@@ -14,7 +14,7 @@ export default function CameraZoom(){
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button onPress={requestPermission} title="grant permission" />
+        <CameraButton onPress={requestPermission} title="grant permission" />
       </View>
     );
   }
@@ -33,14 +33,10 @@ const styles = StyleSheet.create({
   container : {
     flex: 1,
     backgroundColor: 'transparent',
-    margin:200,
   },
 
-  message: {
-    textAlign: 'center',
-    paddingBottom: 10,
-  },
   camera: {
+    position: 'absolute',
     flex: 1,
     alignSelf: 'flex-end',
     width: '100%',

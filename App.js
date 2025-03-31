@@ -6,7 +6,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       <CameraZoom />
-      <StatusBar style="auto" />
+      <StatusBar hidden />  {/* ✅ Hide status bar to prevent layout issues */}
     </View>
   );
 }
@@ -14,8 +14,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'black',  // ✅ Avoid white background
   },
 });
