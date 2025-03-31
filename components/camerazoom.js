@@ -5,7 +5,7 @@ import { PinchGestureHandler } from 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
 import Icon from 'react-native-vector-icons/FontAwesome'; 
 
-export default function CameraZoom() {
+export default function CameraZoom({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [zoom, setZoom] = useState(0); 
   const [scale, setScale] = useState(1); 
@@ -51,7 +51,6 @@ export default function CameraZoom() {
             style={styles.camera} 
             zoom={zoom} 
           >
-
             <TouchableOpacity style={styles.focalLengthButton} onPress={() => setShowDropdown(!showDropdown)}>
               <Text style={styles.focalLengthButtonText}>{selectedFocalLength}mm</Text>
             </TouchableOpacity>
@@ -91,6 +90,14 @@ export default function CameraZoom() {
           </CameraView>
         </View>
       </PinchGestureHandler>
+
+      {/* Home Icon Button */}
+      <TouchableOpacity 
+        style={styles.homeButton} 
+        onPress={() => navigation.navigate('Home')} // Add your home screen navigation logic here
+      >
+        <Icon name="home" size={30} color="white" />
+      </TouchableOpacity>
     </GestureHandlerRootView>
   );
 }
@@ -195,5 +202,18 @@ const styles = StyleSheet.create({
     height: '100%',
     width: 1,
     backgroundColor: 'white',
+  },
+
+  // Home button style
+  homeButton: {
+    position: 'absolute',
+    top: 170,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 5,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ rotate: '90deg' }],
   },
 });
