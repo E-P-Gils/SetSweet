@@ -1,9 +1,10 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useState } from 'react';
-import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView } from 'react-native'; 
+import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image } from 'react-native'; 
 import { PinchGestureHandler } from 'react-native-gesture-handler'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
 import Icon from 'react-native-vector-icons/FontAwesome'; 
+import { Dimensions } from 'react-native';
 
 export default function CameraZoom({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -12,6 +13,17 @@ export default function CameraZoom({ navigation }) {
   const [showDropdown, setShowDropdown] = useState(false); 
   const [selectedFocalLength, setSelectedFocalLength] = useState(18); 
   const [showGrid, setShowGrid] = useState(false); 
+  const [aspectRatio, setAspectRatio] = useState('16:9');  
+  const [showBorder, setShowBorder] = useState(false); 
+
+  const { width, height } = Dimensions.get('window');
+  
+  // Calculate aspect ratio based height
+  const aspectRatioWidth = width;
+  const aspectRatioHeight = height * (3 / 4); // For 4:3 aspect ratio
+  
+  // You can switch the aspect ratio based on your state
+  const cameraHeight = aspectRatio === '16:9' ? height : aspectRatioHeight;
 
   if (!permission) return <View />;
   if (!permission.granted) {
@@ -37,10 +49,20 @@ export default function CameraZoom({ navigation }) {
     setShowDropdown(false); 
   };
 
+  const toggleAspectRatio = () => {
+    if (aspectRatio === '16:9') {
+      setAspectRatio('4:3');
+      setShowBorder(true);
+    } else {
+      setAspectRatio('16:9');
+      setShowBorder(false);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <PinchGestureHandler onGestureEvent={(event) => {
-        let newZoom = zoom + (event.nativeEvent.scale - 1) * 0.1; 
+        let newZoom = zoom + (event.nativeEvent.scale - 1) * 0.015; 
         newZoom = Math.max(0, Math.min(newZoom, 1)); 
         setZoom(newZoom);
         setScale(event.nativeEvent.scale); 
@@ -48,15 +70,15 @@ export default function CameraZoom({ navigation }) {
       }} >
         <View style={styles.cameraContainer}>
           <CameraView 
-            style={styles.camera} 
+            style={[styles.camera, { width, height: cameraHeight }]} 
             zoom={zoom} 
           >
-            <TouchableOpacity style={styles.focalLengthButton} onPress={() => setShowDropdown(!showDropdown)}>
+            <TouchableOpacity style={[styles.focalLengthButton, { left: width * 0.796 }, { top: width * 0.12 }]}  onPress={() => setShowDropdown(!showDropdown)}>
               <Text style={styles.focalLengthButtonText}>{selectedFocalLength}mm</Text>
             </TouchableOpacity>
 
             {showDropdown && (
-              <View style={styles.dropdown}>
+              <View style={[styles.dropdown, { left: width * 0.2, top: width * -0.315 }]} >
                 <ScrollView contentContainerStyle={styles.dropdownContent}>
                   {Array.from({ length: 183 }, (_, i) => i + 18).map((value) => (
                     <TouchableOpacity 
@@ -71,13 +93,13 @@ export default function CameraZoom({ navigation }) {
               </View>
             )}
 
-            <TouchableOpacity style={styles.gridButton} onPress={() => setShowGrid(!showGrid)}>
+            <TouchableOpacity style={[styles.gridButton, { left: width * 0.86 }, { top: width * 0.33 }]} onPress={() => setShowGrid(!showGrid)}>
               <Text style={styles.gridButtonText}>3x3</Text>
             </TouchableOpacity>
 
             {/* 3x3 Grid Overlay */}
             {showGrid && (
-              <View style={[styles.gridOverlay, { pointerEvents: 'none' }]}>
+              <View style={[styles.gridOverlay, { pointerEvents: 'none' }]} >
                 {/* Horizontal Lines */}
                 <View style={[styles.horizontalLine, { top: '33%' }]} />
                 <View style={[styles.horizontalLine, { top: '66%' }]} />
@@ -87,16 +109,23 @@ export default function CameraZoom({ navigation }) {
                 <View style={[styles.verticalLine, { left: '66%' }]} />
               </View>
             )}
+
+            {/* Border with Aspect Ratio Text when activated */}
+            {showBorder && (
+              <View style={[styles.aspectRatioBorder]} />
+            )}
           </CameraView>
         </View>
       </PinchGestureHandler>
 
       {/* Home Icon Button */}
-      <TouchableOpacity 
-        style={styles.homeButton} 
-        onPress={() => navigation.navigate('Home')} // Add your home screen navigation logic here
-      >
+      <TouchableOpacity style={[styles.homeButton, { left: width * 0.87 }, { top: width * 0.615 }]} onPress={() => navigation.navigate('Home')}>
         <Icon name="home" size={30} color="white" />
+      </TouchableOpacity>
+
+      {/* Aspect Ratio Switch Buttons */}
+      <TouchableOpacity style={[styles.aspectRatioButtons, { left: width * 0.86 }, { top: width * 0.47}]} onPress={toggleAspectRatio}>
+        <Icon name="arrows-h" size={30} color="white" style={styles.icon} />
       </TouchableOpacity>
     </GestureHandlerRootView>
   );
@@ -121,7 +150,6 @@ const styles = StyleSheet.create({
   focalLengthButton: {
     position: 'absolute',
     top: 40,
-    left: 333,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -132,7 +160,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 40, 
   },
-  
   focalLengthButtonText: {
     fontSize: 16,
     color: 'white',
@@ -141,8 +168,6 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     position: 'absolute',
-    top: -139,
-    left: 100, 
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 5,
     padding: 10,
@@ -165,22 +190,17 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center', 
   },
-
   gridButton: {
     position: 'absolute',
-    top: 120,
-    right: 5,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 10,
     borderRadius: 5,
     transform: [{ rotate: '90deg' }],
   },
-
   gridButtonText: {
     fontSize: 16,
     color: 'white',
   },
-
   gridOverlay: {
     position: 'absolute',
     top: 0,
@@ -203,17 +223,33 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: 'white',
   },
-
-  // Home button style
   homeButton: {
     position: 'absolute',
-    top: 170,
-    right: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 5,
     borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
     transform: [{ rotate: '90deg' }],
+  },
+  aspectRatioButtons: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 10,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ rotate: '0deg' }],
+  },
+  aspectRatioBorder: {
+    position: 'absolute',
+    borderColor: 'grey',
+    borderWidth: 2,
+    top: 0,
+    left: 0,
+    width: '75%',
+    height: '100%',
+    justifyContent: 'flex-end',
+    paddingBottom: 10,
   },
 });
