@@ -10,6 +10,11 @@ export default function HomePage({ navigation }) {
         <Icon name="video-camera" size={20} color="white" style={styles.icon} />
         <Text style={styles.buttonText}>ViewFinder</Text>
       </TouchableOpacity>
+            
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('DigitalSlate')}>
+        <Icon name="clipboard" size={20} color="white" style={styles.icon} />
+        <Text style={styles.buttonText}>DigiSlate</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
         <Icon name="user" size={20} color="white" style={styles.icon} />
