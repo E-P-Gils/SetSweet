@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image } from 'react-native';
 
 const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
 
@@ -9,13 +10,21 @@ const VerticalLabel = ({ label }) => (
   </View>
 );
 
-const SlateInput = ({ placeholder, style }) => (
-  <TextInput style={[styles.inputField, style]} placeholder={placeholder} placeholderTextColor="#888" />
+const SlateInput = ({ placeholder, big, style, ...props }) => (
+  <TextInput
+    style={[styles.inputField, big && styles.bigInputField, style]}
+    placeholder={placeholder}
+    placeholderTextColor="#888"
+    {...props}
+  />
 );
-
-export default function DigitalSlate() {
+export default function DigitalSlate({ navigation }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
-  const [selectedToggles, setSelectedToggles] = useState([]);
+  const [selectedToggles, setSelectedToggles] = useState({
+    INT_EXT: 'INT', // Default to 'INT'
+    DAY_NITE: 'DAY', // Default to 'DAY'
+    SYNC_MOS: 'SYNC', // Default to 'SYNC'
+  });
 
   const handleClap = () => {
     Animated.sequence([
@@ -24,13 +33,15 @@ export default function DigitalSlate() {
     ]).start();
   };
 
-  const toggleSelection = (label) => {
+  const toggleSelection = (toggleCategory) => {
     setSelectedToggles((prevSelectedToggles) => {
-      if (prevSelectedToggles.includes(label)) {
-        return prevSelectedToggles.filter((item) => item !== label);
+      const newSelection = { ...prevSelectedToggles };
+      if (newSelection[toggleCategory] === 'INT' || newSelection[toggleCategory] === 'DAY' || newSelection[toggleCategory] === 'SYNC') {
+        newSelection[toggleCategory] = toggleCategory === 'INT_EXT' ? 'EXT' : toggleCategory === 'DAY_NITE' ? 'NIGHT' : 'MOS';
       } else {
-        return [...prevSelectedToggles, label];
+        newSelection[toggleCategory] = toggleCategory === 'INT_EXT' ? 'INT' : toggleCategory === 'DAY_NITE' ? 'DAY' : 'SYNC';
       }
+      return newSelection;
     });
   };
 
@@ -41,7 +52,7 @@ export default function DigitalSlate() {
         <Animated.View style={[styles.clapperArm, { transform: [{ rotate: clapAnim.interpolate({
           inputRange: [-25, 0],
           outputRange: ['-25deg', '0deg']
-        }) }] }]}>
+        }) }] }]} >
           {colorBars.map((color, index) => (
             <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
           ))}
@@ -50,19 +61,19 @@ export default function DigitalSlate() {
 
       {/* ROLL / SCENE / TAKE Container */}
       <View style={styles.topTriplet}>
-        <View style={styles.labeledInput}>
-          <VerticalLabel label="ROLL" />
-          <SlateInput placeholder="123" />
-        </View>
-        <View style={styles.labeledInput}>
-          <VerticalLabel label="SCENE" />
-          <SlateInput placeholder="45A" />
-        </View>
-        <View style={styles.labeledInput}>
-          <VerticalLabel label="TAKE" />
-          <SlateInput placeholder="7" />
-        </View>
-      </View>
+  <View style={styles.tripletBox}>
+    <Text style={styles.verticalText}>ROLL</Text>
+    <SlateInput placeholder="123" big style={{ width: '100%' }} />
+  </View>
+  <View style={styles.tripletBox}>
+    <Text style={styles.verticalText}>SCENE</Text>
+    <SlateInput placeholder="45A" big style={{ width: '100%' }} />
+  </View>
+  <View style={styles.tripletBox}>
+    <Text style={styles.verticalText}>TAKE</Text>
+    <SlateInput placeholder="7" big style={{ width: '100%' }} />
+  </View>
+</View>
 
       {/* Slate Body */}
       <View style={styles.slateContainer}>
@@ -81,23 +92,30 @@ export default function DigitalSlate() {
           <SlateInput placeholder="DATE" style={{ flex: 1 }} />
         </View>
 
-        {/* INT / EXT / DAY / NITE / SYNC / MOS checkboxes */}
+        {/* INT / EXT / DAY / NITE / SYNC / MOS Toggle Buttons */}
         <View style={styles.toggleRow}>
-          {['INT', 'EXT', 'DAY', 'NITE', 'SYNC', 'MOS'].map((label) => {
-            const isSelected = selectedToggles.includes(label);
-            return (
-              <TouchableOpacity
-                key={label}
-                onPress={() => toggleSelection(label)}
-                style={[styles.toggleBox, isSelected && styles.toggleBoxSelected]}
-              >
-                <Text style={[styles.toggleText, isSelected && styles.toggleTextSelected]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {['INT_EXT', 'DAY_NITE', 'SYNC_MOS'].map((toggleCategory) => (
+            <TouchableOpacity
+              key={toggleCategory}
+              onPress={() => toggleSelection(toggleCategory)}
+              style={styles.toggleButton}
+            >
+              <Text style={styles.toggleButtonText}>
+                {selectedToggles[toggleCategory]}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+      </View>
+
+      {/* Home and Past Buttons */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Home')}>
+        <Ionicons name="home" size={24} color="#000" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={() => console.log('Past button clicked')}>
+          <Text style={styles.buttonText}>Past</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -111,7 +129,7 @@ const styles = StyleSheet.create({
   },
   clapperArm: {
     flexDirection: 'row',
-    width: 900,
+    width: 850,
     height: 20,
     justifyContent: 'space-between',
     marginBottom: 5,
@@ -130,9 +148,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#000',
     padding: 10,
-    width: 800,
+    width: 750,
     alignSelf: 'center',
-    left: 210,
+    left: 190,
   },
   row: {
     flexDirection: 'row',
@@ -150,10 +168,23 @@ const styles = StyleSheet.create({
   },
   topTriplet: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: 10,
     position: 'relative',
-    left: 210,
+    left: 190, 
+    width: 750, 
+  },
+  tripletBox: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  bigInputField: {
+    width: 150,
+    height: 50,
+    fontSize: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   verticalText: {
     transform: [{ rotate: '90deg' }],
@@ -175,25 +206,48 @@ const styles = StyleSheet.create({
     width: 60,
     marginLeft: 8,
   },
-  toggleBoxSelected: {
-    backgroundColor: '#000',
-  },
-  toggleTextSelected: {
-    color: '#fff',
-  },
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 12,
   },
-  toggleBox: {
-    borderWidth: 1,
+  toggleButton: {
+    backgroundColor: '#fff',
     borderColor: '#000',
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+    borderWidth: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginHorizontal: 5,
   },
-  toggleText: {
-    fontSize: 10,
+  toggleButtonText: {
+    color: '#000',
+    fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    paddingHorizontal: 10,
+  },
+  button: {
+    backgroundColor: '#fff',
+    borderColor: '#000',
+    borderWidth: 2,
+    padding: 10,
+    borderRadius: 5,
+    left: 200,
+  },
+  buttonText: {
+    color: '#000',
+    fontSize: 14,
+  },
+  icon: {
+    width: 20,
+    height: 20,
   },
 });
