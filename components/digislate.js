@@ -1,296 +1,199 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity } from 'react-native';
 
-const DigitalSlate = ({ navigation }) => {
-  // States to handle inputs
-  const [filmTitle, setFilmTitle] = useState('');
-  const [filmDirector, setFilmDirector] = useState('');
-  const [dop, setDop] = useState('');
-  const [date, setDate] = useState('');
-  const [fps, setFps] = useState('');
-  const [camera, setCamera] = useState('');
-  const [slate, setSlate] = useState('');
-  const [scene, setScene] = useState('001');
-  const [take, setTake] = useState('A');
-  const [intExt, setIntExt] = useState('');
-  const [dayNight, setDayNight] = useState('');
-  const [mosSync, setMosSync] = useState('');
-  const [timer, setTimer] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
+const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
 
-  // Timer logic
-  useEffect(() => {
-    let interval;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setTimer((prevTimer) => prevTimer + 1);
-      }, 1000); // Update every second
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [isRecording]);
+const VerticalLabel = ({ label }) => (
+  <View style={styles.verticalBox}>
+    <Text style={styles.verticalText}>{label}</Text>
+  </View>
+);
 
-  const handleStartStop = () => {
-    setIsRecording(prevState => {
-      if (prevState) {
-        setTimer(0); // Clear timer if stopping
+const SlateInput = ({ placeholder, style }) => (
+  <TextInput style={[styles.inputField, style]} placeholder={placeholder} placeholderTextColor="#888" />
+);
+
+export default function DigitalSlate() {
+  const clapAnim = useRef(new Animated.Value(0)).current;
+  const [selectedToggles, setSelectedToggles] = useState([]);
+
+  const handleClap = () => {
+    Animated.sequence([
+      Animated.timing(clapAnim, { toValue: -25, duration: 100, useNativeDriver: true }),
+      Animated.timing(clapAnim, { toValue: 0, duration: 100, useNativeDriver: true })
+    ]).start();
+  };
+
+  const toggleSelection = (label) => {
+    setSelectedToggles((prevSelectedToggles) => {
+      if (prevSelectedToggles.includes(label)) {
+        return prevSelectedToggles.filter((item) => item !== label);
+      } else {
+        return [...prevSelectedToggles, label];
       }
-      return !prevState;
     });
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.formContainerWide}>
-          {/* Wider Container for Film Info */}
-          <View style={styles.wideRow}>
-            <View style={styles.fieldContainerWide}>
-              <Text style={styles.fieldLabel}>Film Title</Text>
-              <TextInput
-                style={styles.inputWide}
-                value={filmTitle}
-                onChangeText={setFilmTitle}
-                placeholder="Film Title"
-              />
-            </View>
+    <View style={styles.wrapper}>
+      {/* Tap area for the clapper */}
+      <TouchableWithoutFeedback onPress={handleClap}>
+        <Animated.View style={[styles.clapperArm, { transform: [{ rotate: clapAnim.interpolate({
+          inputRange: [-25, 0],
+          outputRange: ['-25deg', '0deg']
+        }) }] }]}>
+          {colorBars.map((color, index) => (
+            <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
+          ))}
+        </Animated.View>
+      </TouchableWithoutFeedback>
 
-            <View style={styles.fieldContainerWide}>
-              <Text style={styles.fieldLabel}>Director</Text>
-              <TextInput
-                style={styles.inputWide}
-                value={filmDirector}
-                onChangeText={setFilmDirector}
-                placeholder="Film Director"
-              />
-            </View>
-          </View>
+      {/* ROLL / SCENE / TAKE Container */}
+      <View style={styles.topTriplet}>
+        <View style={styles.labeledInput}>
+          <VerticalLabel label="ROLL" />
+          <SlateInput placeholder="123" />
         </View>
-
-        <View style={styles.formContainer}>
-          {/* Row 2 */}
-          <View style={styles.row}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Date</Text>
-              <TextInput
-                style={styles.input}
-                value={date}
-                onChangeText={setDate}
-                placeholder="Date"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>FPS</Text>
-              <TextInput
-                style={styles.input}
-                value={fps}
-                onChangeText={setFps}
-                placeholder="FPS"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Camera</Text>
-              <TextInput
-                style={styles.input}
-                value={camera}
-                onChangeText={setCamera}
-                placeholder="Camera"
-              />
-            </View>
-          </View>
-
-          {/* Row 3 */}
-          <View style={styles.row}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Cam</Text>
-              <TextInput
-                style={styles.input}
-                value={slate}
-                onChangeText={setSlate}
-                placeholder="Cam"
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Scene</Text>
-              <TextInput
-                style={styles.input}
-                value={scene}
-                onChangeText={setScene}
-                placeholder="Scene"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Take</Text>
-              <TextInput
-                style={styles.input}
-                value={take}
-                onChangeText={setTake}
-                placeholder="Take"
-              />
-            </View>
-          </View>
-
-          {/* Row 4 */}
-          <View style={styles.row}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>INT/EXT</Text>
-              <TextInput
-                style={styles.input}
-                value={intExt}
-                onChangeText={setIntExt}
-                placeholder="INT or EXT"
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>DAY/NIGHT</Text>
-              <TextInput
-                style={styles.input}
-                value={dayNight}
-                onChangeText={setDayNight}
-                placeholder="DAY or NIGHT"
-              />
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>MOS/SYNC</Text>
-              <TextInput
-                style={styles.input}
-                value={mosSync}
-                onChangeText={setMosSync}
-                placeholder="MOS or SYNC"
-              />
-            </View>
-          </View>
+        <View style={styles.labeledInput}>
+          <VerticalLabel label="SCENE" />
+          <SlateInput placeholder="45A" />
         </View>
-      </ScrollView>
-
-      {/* Timer */}
-      <Text style={styles.timer}>{formatTime(timer)}</Text>
-
-      {/* Control Buttons */}
-      <View style={styles.buttonContainer}>
-        <Ionicons 
-          name={isRecording ? 'stop-circle' : 'play-circle'} 
-          size={64} 
-          color="#ffcc00" 
-          onPress={handleStartStop} 
-        />
+        <View style={styles.labeledInput}>
+          <VerticalLabel label="TAKE" />
+          <SlateInput placeholder="7" />
+        </View>
       </View>
 
-      {/* Home Icon Button */}
-      <View style={styles.buttonContainer}>
-        <Ionicons 
-          name="home" 
-          size={40} 
-          color="#ffcc00" 
-          onPress={() => navigation.navigate('Home')} 
-        />
+      {/* Slate Body */}
+      <View style={styles.slateContainer}>
+        {/* Full Width Fields */}
+        <View style={styles.row}>
+          <SlateInput placeholder="PROD" style={{ flex: 1 }} />
+        </View>
+        <View style={styles.row}>
+          <SlateInput placeholder="DIR" style={{ flex: 1 }} />
+        </View>
+        <View style={styles.row}>
+          <SlateInput placeholder="CAM" style={{ flex: 1 }} />
+          <SlateInput placeholder="FPS" style={styles.smallField} />
+        </View>
+        <View style={styles.row}>
+          <SlateInput placeholder="DATE" style={{ flex: 1 }} />
+        </View>
+
+        {/* INT / EXT / DAY / NITE / SYNC / MOS checkboxes */}
+        <View style={styles.toggleRow}>
+          {['INT', 'EXT', 'DAY', 'NITE', 'SYNC', 'MOS'].map((label) => {
+            const isSelected = selectedToggles.includes(label);
+            return (
+              <TouchableOpacity
+                key={label}
+                onPress={() => toggleSelection(label)}
+                style={[styles.toggleBox, isSelected && styles.toggleBoxSelected]}
+              >
+                <Text style={[styles.toggleText, isSelected && styles.toggleTextSelected]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
-};
-
-// Helper function to format the timer
-const formatTime = (time) => {
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'black',
-    padding: 20,
+  wrapper: {
+    alignItems: 'center',
+    marginTop: 50,
+    transform: [{ rotate: '90deg' }],
   },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'space-around',
-    paddingVertical: 30,
-  },
-  formContainerWide: {
-    marginBottom: 40, // Bigger space under the wider container
-  },
-  wideRow: {
+  clapperArm: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  formContainer: {
-    flexDirection: 'column',
+    width: 900,
+    height: 20,
     justifyContent: 'space-between',
+    marginBottom: 5,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+    overflow: 'hidden',
+    elevation: 3,
+    left: 190,
+  },
+  colorBar: {
+    flex: 1,
+    height: '100%',
+  },
+  slateContainer: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#000',
+    padding: 10,
+    width: 800,
+    alignSelf: 'center',
+    left: 210,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  fieldContainerWide: {
-    alignItems: 'center',
-    width: '45%', // Wider width for film title, director, and DOP
-    marginVertical: 10,
-    transform: [{ rotate: '90deg' }],
-    right: 15,
-  },
-  fieldContainer: {
-    alignItems: 'center',
-    width: '45%', // Wider width for film title, director, and DOP
-    marginVertical: 10,
-    transform: [{ rotate: '90deg' }],
-  },
-  fieldLabel: {
-    color: 'white',
     marginBottom: 8,
-    fontSize: 16,
-    textAlign: 'center',
   },
-  input: {
-    backgroundColor: 'white',
-    color: 'black',
-    fontSize: 18,
-    padding: 10,
-    width: '100%',
-    borderRadius: 8,
-    textAlign: 'center',
+  labeledInput: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginRight: 10,
   },
-  inputWide: {
-    backgroundColor: 'white',
-    color: 'black',
-    fontSize: 18,
-    padding: 12,
-    width: '100%',
-    borderRadius: 8,
-    textAlign: 'center',
+  verticalBox: {
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  timer: {
-    fontSize: 48,
-    color: '#ffcc00',
-    marginBottom: 40,
-    textAlign: 'center',
-    transform: [{ rotate: '90deg' }],
-    top: 79,
-    right: -55,
-  },
-  buttonContainer: {
+  topTriplet: {
     flexDirection: 'row',
     justifyContent: 'center',
-    width: '70%',
-    alignSelf: 'center',
-    marginTop: 30,
+    marginBottom: 10,
+    position: 'relative',
+    left: 210,
+  },
+  verticalText: {
     transform: [{ rotate: '90deg' }],
-    top: -100,
-    left: -120,
+    fontWeight: 'bold',
+    fontSize: 12,
+    letterSpacing: 1,
+    transform: [{ rotate: '360deg' }],
+  },
+  inputField: {
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 6,
+    width: 100,
+    marginTop: 4,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  smallField: {
+    width: 60,
+    marginLeft: 8,
+  },
+  toggleBoxSelected: {
+    backgroundColor: '#000',
+  },
+  toggleTextSelected: {
+    color: '#fff',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  toggleBox: {
+    borderWidth: 1,
+    borderColor: '#000',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  toggleText: {
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
-
-export default DigitalSlate;

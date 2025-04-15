@@ -18,11 +18,13 @@ export default function CameraZoom({ navigation }) {
 
   const { width, height } = Dimensions.get('window');
   
+  // Dynamically calculate the zoom based on the screen width
+  const screenWidthRatio = width / 375; // 375 is a baseline for smaller devices (like iPhone SE)
+
   // Calculate aspect ratio based height
   const aspectRatioWidth = width;
   const aspectRatioHeight = height * (3 / 4); // For 4:3 aspect ratio
   
-  // You can switch the aspect ratio based on your state
   const cameraHeight = aspectRatio === '16:9' ? height : aspectRatioHeight;
 
   if (!permission) return <View />;
@@ -36,11 +38,14 @@ export default function CameraZoom({ navigation }) {
   }
 
   const calculateZoom = (focalLength) => {
-    return (focalLength - 18) / (200 - 18); 
+    // Adjust zoom based on screen size for consistency across devices
+    const baseZoom = (focalLength - 18) / (200 - 18); 
+    return baseZoom * screenWidthRatio;  // Scale the zoom for different devices
   };
 
   const calculateFocalLength = (zoom) => {
-    return Math.round(18 + zoom * (200 - 18));
+    const focalLength = Math.round(18 + zoom * (200 - 18));
+    return focalLength;
   };
 
   const handleFocalLengthSelect = (value) => {
