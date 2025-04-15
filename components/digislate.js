@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image } from 'react-native';
 
 const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
@@ -18,21 +19,32 @@ const SlateInput = ({ placeholder, big, style, ...props }) => (
     {...props}
   />
 );
+
 export default function DigitalSlate({ navigation }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
   const [selectedToggles, setSelectedToggles] = useState({
-    INT_EXT: 'INT', // Default to 'INT'
-    DAY_NITE: 'DAY', // Default to 'DAY'
-    SYNC_MOS: 'SYNC', // Default to 'SYNC'
+    INT_EXT: 'INT',
+    DAY_NITE: 'DAY',
+    SYNC_MOS: 'SYNC',
   });
 
-  const handleClap = () => {
+  const handleClap = async () => {
+    try {
+      // Create and play the sound every time the clapper is clicked
+      const { sound } = await Audio.Sound.createAsync(
+        require('../assets/slateclapper.mp3')
+      );
+      await sound.playAsync();
+    } catch (error) {
+      console.error('Error playing clap sound:', error);
+    }
+  
     Animated.sequence([
-      Animated.timing(clapAnim, { toValue: -25, duration: 100, useNativeDriver: true }),
+      Animated.timing(clapAnim, { toValue: 90, duration: 100, useNativeDriver: true }),
       Animated.timing(clapAnim, { toValue: 0, duration: 100, useNativeDriver: true })
     ]).start();
   };
-
+  
   const toggleSelection = (toggleCategory) => {
     setSelectedToggles((prevSelectedToggles) => {
       const newSelection = { ...prevSelectedToggles };
@@ -47,37 +59,30 @@ export default function DigitalSlate({ navigation }) {
 
   return (
     <View style={styles.wrapper}>
-      {/* Tap area for the clapper */}
       <TouchableWithoutFeedback onPress={handleClap}>
-        <Animated.View style={[styles.clapperArm, { transform: [{ rotate: clapAnim.interpolate({
-          inputRange: [-25, 0],
-          outputRange: ['-25deg', '0deg']
-        }) }] }]} >
+        <Animated.View style={[styles.clapperArm, { transform: [{ translateY: clapAnim }] }]}>
           {colorBars.map((color, index) => (
             <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
           ))}
         </Animated.View>
       </TouchableWithoutFeedback>
 
-      {/* ROLL / SCENE / TAKE Container */}
       <View style={styles.topTriplet}>
-  <View style={styles.tripletBox}>
-    <Text style={styles.verticalText}>ROLL</Text>
-    <SlateInput placeholder="123" big style={{ width: '100%' }} />
-  </View>
-  <View style={styles.tripletBox}>
-    <Text style={styles.verticalText}>SCENE</Text>
-    <SlateInput placeholder="45A" big style={{ width: '100%' }} />
-  </View>
-  <View style={styles.tripletBox}>
-    <Text style={styles.verticalText}>TAKE</Text>
-    <SlateInput placeholder="7" big style={{ width: '100%' }} />
-  </View>
-</View>
+        <View style={styles.tripletBox}>
+          <Text style={styles.verticalText}>ROLL</Text>
+          <SlateInput placeholder="123" big style={{ width: '100%' }} />
+        </View>
+        <View style={styles.tripletBox}>
+          <Text style={styles.verticalText}>SCENE</Text>
+          <SlateInput placeholder="45A" big style={{ width: '100%' }} />
+        </View>
+        <View style={styles.tripletBox}>
+          <Text style={styles.verticalText}>TAKE</Text>
+          <SlateInput placeholder="7" big style={{ width: '100%' }} />
+        </View>
+      </View>
 
-      {/* Slate Body */}
       <View style={styles.slateContainer}>
-        {/* Full Width Fields */}
         <View style={styles.row}>
           <SlateInput placeholder="PROD" style={{ flex: 1 }} />
         </View>
@@ -92,7 +97,6 @@ export default function DigitalSlate({ navigation }) {
           <SlateInput placeholder="DATE" style={{ flex: 1 }} />
         </View>
 
-        {/* INT / EXT / DAY / NITE / SYNC / MOS Toggle Buttons */}
         <View style={styles.toggleRow}>
           {['INT_EXT', 'DAY_NITE', 'SYNC_MOS'].map((toggleCategory) => (
             <TouchableOpacity
@@ -108,13 +112,9 @@ export default function DigitalSlate({ navigation }) {
         </View>
       </View>
 
-      {/* Home and Past Buttons */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Home')}>
-        <Ionicons name="home" size={24} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => console.log('Past button clicked')}>
-          <Text style={styles.buttonText}>Past</Text>
+          <Ionicons name="home" size={24} color="#000" />
         </TouchableOpacity>
       </View>
     </View>
@@ -187,11 +187,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   verticalText: {
-    transform: [{ rotate: '90deg' }],
+    transform: [{ rotate: '360deg' }],
     fontWeight: 'bold',
     fontSize: 12,
     letterSpacing: 1,
-    transform: [{ rotate: '360deg' }],
   },
   inputField: {
     borderWidth: 1,
@@ -208,8 +207,9 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: 12,
+    right: 130,
   },
   toggleButton: {
     backgroundColor: '#fff',
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     padding: 10,
     borderRadius: 5,
-    left: 200,
+    left: 500,
   },
   buttonText: {
     color: '#000',
