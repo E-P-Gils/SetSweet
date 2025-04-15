@@ -16,7 +16,7 @@ export default function HomePage({ navigation }) {
         <Text style={styles.buttonText}>DigiSlate</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('LoginForm')}>
         <Icon name="user" size={20} color="white" style={styles.icon} />
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
