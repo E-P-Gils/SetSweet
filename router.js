@@ -4,6 +4,7 @@ const User = require('./models/user');
 const Like = require('./models/project');
 const path = require('path');
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 
 const PORT = 3001;
 const app = express();
@@ -44,40 +45,44 @@ router.get('/users/:id', async (req, res) => {
 });
 
 // Register a new user
+
 router.post('/register', async (req, res) => {
-  try {
-    console.log(req.body);
-    const { email, password} = req.body;
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: 'User already exists' });
-
-    const user = new User({
-      email,
-      password
-    });
-
-    await user.save();
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to register user', error });
-  }
-});
+    try {
+      const { email, password } = req.body;
+      const existingUser = await User.findOne({ email });
+      if (existingUser) return res.status(400).json({ message: 'User already exists' });
+  
+      // Hash the password
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+  
+      const user = new User({
+        email,
+        password: hashedPassword,
+      });
+  
+      await user.save();
+      res.status(201).json(user);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to register user', error });
+    }
+  });
 
 // Login user
 router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    const validPassword = password === user.password;
-    if (!validPassword) return res.status(401).json({ message: 'Invalid password' });
-
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to log in user', error });
-  }
-});
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ message: 'User not found' });
+  
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) return res.status(401).json({ message: 'Invalid password' });
+  
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to log in user', error });
+    }
+  });
 
 app.use('/api', router);
 

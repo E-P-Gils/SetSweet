@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import axios from 'axios';
 
-const LoginForm = ({ setIsLoggedIn, setUserData, navigation }) => {
+const LoginForm = ({
+  setIsLoggedIn = () => {},
+  setUserData = () => {},
+  navigation,
+}) => {
   const [isRegister, setIsRegister] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -17,14 +21,12 @@ const LoginForm = ({ setIsLoggedIn, setUserData, navigation }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Email validation
     if (!formData.email) {
       newErrors.email = 'Email is required.';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address.';
     }
 
-    // Password validation
     if (!formData.password) newErrors.password = 'Password is required.';
 
     setErrors(newErrors);
@@ -32,24 +34,21 @@ const LoginForm = ({ setIsLoggedIn, setUserData, navigation }) => {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       const url = isRegister
         ? 'http://localhost:3001/api/register'
         : 'http://localhost:3001/api/login';
+
       const response = await axios.post(url, formData);
 
       if (response.status === 200 || response.status === 201) {
         Alert.alert('Success', isRegister ? 'Registration successful!' : 'Login successful!');
-        setUserData(response.data);
-        setIsLoggedIn(true);
+        if (typeof setUserData === 'function') setUserData(response.data);
+        if (typeof setIsLoggedIn === 'function') setIsLoggedIn(true);
 
-        if (isRegister) {
-          setIsRegister(false); // Switch to login mode after registration
-        }
+        if (isRegister) setIsRegister(false); // Switch to login mode
       }
     } catch (err) {
       console.error('Error:', err);
@@ -61,7 +60,6 @@ const LoginForm = ({ setIsLoggedIn, setUserData, navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>{isRegister ? 'Register' : 'Login'}</Text>
 
-      {/* Email */}
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -72,7 +70,6 @@ const LoginForm = ({ setIsLoggedIn, setUserData, navigation }) => {
       />
       {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
-      {/* Password */}
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -88,10 +85,14 @@ const LoginForm = ({ setIsLoggedIn, setUserData, navigation }) => {
 
       {errors.general && <Text style={styles.errorText}>{errors.general}</Text>}
 
-      <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
-        <Text style={styles.switchText}>
+      <TouchableOpacity style={styles.button} onPress={() => setIsRegister(!isRegister)}>
+        <Text style={styles.buttonText}>
           {isRegister ? 'Already have an account? Login' : "Don't have an account? Register"}
         </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.homeButton} onPress={() => navigation.navigate('Home')}>
+        <Text style={styles.homeButtonText}>Back to Home</Text>
       </TouchableOpacity>
     </View>
   );
@@ -103,12 +104,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#00B5B8',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#fff',
   },
   input: {
     width: '100%',
@@ -117,9 +119,10 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 5,
     marginBottom: 10,
+    backgroundColor: '#fff',
   },
   button: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#F8A8B8',
     padding: 10,
     borderRadius: 5,
     width: '100%',
@@ -131,12 +134,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   errorText: {
-    color: 'red',
+    color: 'white',
     marginTop: 5,
   },
-  switchText: {
-    marginTop: 15,
-    color: '#007bff',
+  homeButton: {
+    backgroundColor: '#F8A8B8',
+    padding: 10,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  homeButtonText: {
+    color: '#fff',
     fontSize: 16,
   },
 });
