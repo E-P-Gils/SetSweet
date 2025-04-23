@@ -35,20 +35,24 @@ const LoginForm = ({
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
+  
     try {
       const url = isRegister
         ? 'http://localhost:3001/api/register'
         : 'http://localhost:3001/api/login';
-
+  
       const response = await axios.post(url, formData);
-
+  
       if (response.status === 200 || response.status === 201) {
         Alert.alert('Success', isRegister ? 'Registration successful!' : 'Login successful!');
         if (typeof setUserData === 'function') setUserData(response.data);
         if (typeof setIsLoggedIn === 'function') setIsLoggedIn(true);
-
-        if (isRegister) setIsRegister(false); // Switch to login mode
+  
+        if (isRegister) {
+          setIsRegister(false); // Switch to login mode
+        } else {
+          navigation.navigate('Home'); // ✅ Navigate to Home on successful login
+        }
       }
     } catch (err) {
       console.error('Error:', err);
