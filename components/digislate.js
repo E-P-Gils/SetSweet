@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image } from 'react-native';
 
 const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
+const topClapperColors = ['#f7ec13', '#00a94f', '#0072ce', '#e30613', '#ffffff', '#a0a0a0', '#4a4a4a', '#000'];
 
 const VerticalLabel = ({ label }) => (
   <View style={styles.verticalBox}>
@@ -22,25 +23,37 @@ const SlateInput = ({ placeholder, big, style, ...props }) => (
 
 export default function DigitalSlate({ navigation }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
+  const soundRef = useRef(null);
   const [selectedToggles, setSelectedToggles] = useState({
     INT_EXT: 'INT',
     DAY_NITE: 'DAY',
     SYNC_MOS: 'SYNC',
   });
 
-  const handleClap = async () => {
-    try {
-      // Create and play the sound every time the clapper is clicked
+  // Load sound once
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
       const { sound } = await Audio.Sound.createAsync(
-        require('../assets/slateclapper.mp3')
+        require('../assets/slateclapper.mp3'),
+        { shouldPlay: false }
       );
-      await sound.playAsync();
-    } catch (error) {
-      console.error('Error playing clap sound:', error);
-    }
-  
+      if (isMounted) soundRef.current = sound;
+    })();
+
+    // Unload on unmount
+    return () => {
+      isMounted = false;
+      soundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  const handleClap = () => {
+    // Play immediately – no await so UI stays snappy
+    soundRef.current?.replayAsync().catch(console.warn);
+
     Animated.sequence([
-      Animated.timing(clapAnim, { toValue: 90, duration: 100, useNativeDriver: true }),
+      Animated.timing(clapAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
       Animated.timing(clapAnim, { toValue: 0, duration: 100, useNativeDriver: true })
     ]).start();
   };
@@ -60,11 +73,33 @@ export default function DigitalSlate({ navigation }) {
   return (
     <View style={styles.wrapper}>
       <TouchableWithoutFeedback onPress={handleClap}>
-        <Animated.View style={[styles.clapperArm, { transform: [{ translateY: clapAnim }] }]}>
-          {colorBars.map((color, index) => (
-            <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
-          ))}
-        </Animated.View>
+        <View style={styles.clapperContainer}>
+          {/* Top clapper arm (animated) */}
+          <Animated.View 
+            style={[
+              styles.clapperArm, 
+              styles.topClapper,
+              {
+                transform: [{
+                  translateY: clapAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-20, 19.5]
+                  })
+                }]
+              }
+            ]}>
+            {topClapperColors.map((color, index) => (
+              <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
+            ))}
+          </Animated.View>
+          
+          {/* Bottom clapper arm (stationary) */}
+          <View style={[styles.clapperArm, styles.bottomClapper]}>
+            {colorBars.map((color, index) => (
+              <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
+            ))}
+          </View>
+        </View>
       </TouchableWithoutFeedback>
 
       <View style={styles.topTriplet}>
@@ -127,17 +162,34 @@ const styles = StyleSheet.create({
     marginTop: 50,
     transform: [{ rotate: '90deg' }],
   },
+  clapperContainer: {
+    position: 'relative',
+    width: 850,
+    height: 40,
+    marginBottom: 5,
+    left: 185,
+  },
   clapperArm: {
     flexDirection: 'row',
     width: 850,
     height: 20,
     justifyContent: 'space-between',
-    marginBottom: 5,
     borderTopLeftRadius: 5,
     borderTopRightRadius: 5,
     overflow: 'hidden',
     elevation: 3,
-    left: 190,
+  },
+  topClapper: {
+    position: 'absolute',
+    top: -20,
+  },
+  bottomClapper: {
+    position: 'absolute',
+    top: 20,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
   },
   colorBar: {
     flex: 1,
@@ -150,7 +202,7 @@ const styles = StyleSheet.create({
     padding: 10,
     width: 750,
     alignSelf: 'center',
-    left: 190,
+    left: 185,
   },
   row: {
     flexDirection: 'row',
@@ -161,17 +213,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  verticalBox: {
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   topTriplet: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
     position: 'relative',
-    left: 190, 
+    left: 185, 
     width: 750, 
   },
   tripletBox: {
