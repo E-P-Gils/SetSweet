@@ -7,6 +7,10 @@ import CameraZoom from './components/camerazoom';
 import DigitalSlate from './components/digislate';
 import LoginForm from './components/loginform';
 import ProjectScreen from './components/projectpage';
+import ProjectOptions from './components/projectoptions';
+import Scenes from './components/scenes';
+import SceneOptions from './components/sceneoptions';
+import Notes from './components/notes';
 
 const Stack = createStackNavigator(); // Create a stack navigator for the app
 
@@ -38,6 +42,26 @@ export default function App() {
           name="ProjectScreen" 
           component={ProjectScreen}
           options={{ headerShown: false }} // Hide the header for the CameraZoom screen
+        />
+        <Stack.Screen 
+          name="ProjectOptions" 
+          component={ProjectOptions}
+          options={{ headerShown: false }} // Hide the header for the ProjectOptions screen
+        />
+        <Stack.Screen 
+          name="Scenes" 
+          component={Scenes}
+          options={{ headerShown: false }} // Hide the header for the Scenes screen
+        />
+        <Stack.Screen 
+          name="SceneOptions" 
+          component={SceneOptions}
+          options={{ headerShown: false }} // Hide the header for the SceneOptions screen
+        />
+        <Stack.Screen 
+          name="Notes" 
+          component={Notes}
+          options={{ headerShown: false }} // Hide the header for the Notes screen
         />
       </Stack.Navigator>
       <StatusBar hidden />  {/* ✅ Hide status bar to prevent layout issues */}

@@ -1,4 +1,4 @@
-// ProjectScreen.js
+// SceneScreen.js
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -11,73 +11,74 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
-export default function ProjectScreen({ navigation }) {
-  const [projects, setProjects] = useState([]);
+export default function SceneScreen({ navigation, route }) {
+  /* If you navigated here with   navigation.navigate('SceneScreen', { project })  
+     you can pull the parent project like this ↓   */
+  const { project } = route.params ?? {};
+
+  const [scenes, setScenes] = useState([]);
   const [showInput, setShowInput] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const inputRef = useRef(null);
 
-  // Focus input when modal is shown
+  /* -------- focus the text box when it appears -------- */
   useEffect(() => {
     if (showInput && inputRef.current) {
-      setTimeout(() => {
-        inputRef.current.focus();
-      }, 100);
+      setTimeout(() => inputRef.current.focus(), 100);
     }
   }, [showInput]);
 
-  // ---------- helpers ----------
-  const addProject = () => {
+  /* -------- helpers -------- */
+  const addScene = () => {
     const title = newTitle.trim();
     if (!title) {
-      Alert.alert('Please enter a project title');
+      Alert.alert('Please enter a scene title / slug');
       return;
     }
 
-    setProjects(prev => [...prev, { id: Date.now().toString(), title }]);
+    setScenes(prev => [...prev, { id: Date.now().toString(), title }]);
     setNewTitle('');
     setShowInput(false);
   };
 
-  const deleteProject = (id) => {
-    Alert.alert('Delete Project', 'Are you sure?', [
+  const deleteScene = (id) => {
+    Alert.alert('Delete Scene', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () =>
-          setProjects((prev) => prev.filter((proj) => proj.id !== id)),
+        onPress: () => setScenes(prev => prev.filter(s => s.id !== id)),
       },
     ]);
   };
 
   const handleInputToggle = () => setShowInput(s => !s);
 
-  // ---------- render ----------
+  /* -------- render -------- */
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Your Projects</Text>
+      <Text style={styles.title}>
+        {project ? `${project.title} – Scenes` : 'Scenes'}
+      </Text>
 
-      {!showInput && projects.length === 0 && (
-        <Text style={styles.emptyText}>Press + to Create a New Project!</Text>
+      {!showInput && scenes.length === 0 && (
+        <Text style={styles.emptyText}>Press + to create a new scene</Text>
       )}
 
       <View style={styles.listContainer}>
         <FlatList
-          data={projects}
-          keyExtractor={(item) => item.id}
+          data={scenes}
+          keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <TouchableOpacity
                 style={styles.cardLeft}
-                onPress={() =>
-                  navigation.navigate('ProjectOptions', { project: item })
-                }>
-                <Icon name="film" size={18} color="#fff" style={styles.cardIcon} />
+                onPress={() => navigation.navigate('SceneOptions', { scene: item, project })}>
+                <Icon name="bookmark" size={18} color="#fff" style={styles.cardIcon} />
                 <Text style={styles.cardText}>{item.title}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => deleteProject(item.id)}>
+              <TouchableOpacity onPress={() => deleteScene(item.id)}>
                 <Icon name="trash" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -91,11 +92,11 @@ export default function ProjectScreen({ navigation }) {
           <TextInput
             ref={inputRef}
             style={styles.input}
-            placeholder="Project title"
+            placeholder="Scene title"
             value={newTitle}
             onChangeText={setNewTitle}
           />
-          <TouchableOpacity style={styles.createBtn} onPress={addProject}>
+          <TouchableOpacity style={styles.createBtn} onPress={addScene}>
             <Text style={styles.createBtnText}>Create</Text>
           </TouchableOpacity>
         </View>
@@ -104,9 +105,9 @@ export default function ProjectScreen({ navigation }) {
       {/* FABs */}
       <View style={styles.fabContainer}>
         <TouchableOpacity
-          style={[styles.fab, styles.homeFab]}
-          onPress={() => navigation.navigate('Home')}>
-          <Icon name="home" size={24} color="#fff" />
+          style={[styles.fab, styles.backFab]}
+          onPress={() => navigation.navigate('ProjectOptions', { project })}>
+          <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.fab} onPress={handleInputToggle}>
@@ -117,7 +118,7 @@ export default function ProjectScreen({ navigation }) {
   );
 }
 
-// ---------- styles ----------
+/* ---------- styles ---------- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -131,18 +132,17 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: 'bold',
     marginBottom: 20,
-    alignSelf: 'center',
+    textAlign: 'center',
   },
   emptyText: {
     color: '#fff',
-    alignSelf: 'center',
     marginTop: 20,
   },
   listContainer: {
     flex: 1,
     width: '100%',
     marginTop: 100,
-    paddingBottom: 200, // Add padding to prevent overlap with input/FABs
+    paddingBottom: 200,
   },
   card: {
     flexDirection: 'row',
@@ -157,6 +157,7 @@ const styles = StyleSheet.create({
   cardLeft: { flexDirection: 'row', alignItems: 'center' },
   cardIcon: { marginRight: 10 },
   cardText: { color: '#fff', fontSize: 18 },
+  /* input row */
   inputContainer: {
     position: 'absolute',
     bottom: 700,
@@ -185,6 +186,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  /* FABs */
   fabContainer: {
     position: 'absolute',
     right: 25,
@@ -201,7 +203,7 @@ const styles = StyleSheet.create({
     elevation: 4,
     marginLeft: 10,
   },
-  homeFab: {
+  backFab: {
     backgroundColor: '#F8A8B8',
   },
 });
