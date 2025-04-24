@@ -1,5 +1,5 @@
 // ProjectScreen.js
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,18 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 export default function ProjectScreen({ navigation }) {
   const [projects, setProjects] = useState([]);
   const [showInput, setShowInput] = useState(false);
-  const [showCreateButton, setShowCreateButton] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const inputRef = useRef(null);
+
+  // Focus input when modal is shown
+  useEffect(() => {
+    if (showInput && inputRef.current) {
+      // Small delay to ensure the input is mounted
+      setTimeout(() => {
+        inputRef.current.focus();
+      }, 100);
+    }
+  }, [showInput]);
 
   // ---------- helpers ----------
   const addProject = () => {
@@ -31,15 +41,24 @@ export default function ProjectScreen({ navigation }) {
       title: trimmedTitle
     };
 
-    // Update projects list
-    setProjects(prev => [...prev, newProject]);
+    // Update projects list immediately
+    setProjects(prev => {
+      const updatedProjects = [...prev, newProject];
+      return updatedProjects;
+    });
     
-    // Reset input and close modal
-    setNewTitle('');
-    setShowInput(false);
+    // Reset input and close modal after a short delay
+    setTimeout(() => {
+      setNewTitle('');
+      setShowInput(false);
+    }, 100);
   };
 
-  // Reset input when modal is closed
+  const handleModalOpen = () => {
+    setNewTitle(''); // Clear any previous input
+    setShowInput(true);
+  };
+
   const handleModalClose = () => {
     setNewTitle('');
     setShowInput(false);
@@ -66,36 +85,38 @@ export default function ProjectScreen({ navigation }) {
         <Text style={styles.emptyText}>Press + to Create a New Project!</Text>
       )}
 
-      <FlatList
-        data={projects}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={styles.cardLeft}
-              onPress={() =>
-                navigation.navigate('ProjectDashboard', { project: item })
-              }>
-              <Icon name="film" size={18} color="#fff" style={styles.cardIcon} />
-              <Text style={styles.cardText}>{item.title}</Text>
-            </TouchableOpacity>
+      <View style={styles.listContainer}>
+        <FlatList
+          data={projects}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.cardLeft}
+                onPress={() =>
+                  navigation.navigate('ProjectDashboard', { project: item })
+                }>
+                <Icon name="film" size={18} color="#fff" style={styles.cardIcon} />
+                <Text style={styles.cardText}>{item.title}</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => deleteProject(item.id)}>
-              <Icon name="trash" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+              <TouchableOpacity onPress={() => deleteProject(item.id)}>
+                <Icon name="trash" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      </View>
 
       {/* floating input */}
       {showInput && (
         <View style={styles.inputContainer}>
           <TextInput
+            ref={inputRef}
             style={styles.input}
             placeholder="Project title"
             value={newTitle}
             onChangeText={setNewTitle}
-            autoFocus={true}
           />
           <TouchableOpacity style={styles.createBtn} onPress={addProject}>
             <Text style={styles.createBtnText}>Create</Text>
@@ -112,7 +133,7 @@ export default function ProjectScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => showInput ? handleModalClose() : setShowInput(true)}>
+          onPress={() => showInput ? handleModalClose() : handleModalOpen()}>
           <Icon name={showInput ? 'close' : 'plus'} size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -127,6 +148,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     backgroundColor: '#00B5B8',
+    alignItems: 'center',
   },
   title: {
     color: '#fff',
@@ -140,6 +162,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 20,
   },
+  listContainer: {
+    flex: 1,
+    width: '100%',
+    marginTop: 100,
+    paddingBottom: 200, // Add padding to prevent overlap with input/FABs
+  },
   card: {
     flexDirection: 'row',
     backgroundColor: '#F8A8B8',
@@ -148,7 +176,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     justifyContent: 'space-between',
     alignItems: 'center',
-    bottom: -90,
+    width: '100%',
   },
   cardLeft: { flexDirection: 'row', alignItems: 'center' },
   cardIcon: { marginRight: 10 },
