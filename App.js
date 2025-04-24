@@ -5,6 +5,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import HomePage from './components/homepage';
 import CameraZoom from './components/camerazoom';
 import DigitalSlate from './components/digislate';
+import LoginForm from './components/loginform';
+import ProjectScreen from './components/projectpage';
 
 const Stack = createStackNavigator(); // Create a stack navigator for the app
 
@@ -25,6 +27,16 @@ export default function App() {
         <Stack.Screen 
           name="DigitalSlate" 
           component={DigitalSlate} 
+          options={{ headerShown: false }} // Hide the header for the CameraZoom screen
+        />
+        <Stack.Screen 
+          name="LoginForm" 
+          component={LoginForm} 
+          options={{ headerShown: false }} // Hide the header for the CameraZoom screen
+        />
+        <Stack.Screen 
+          name="ProjectScreen" 
+          component={ProjectScreen}
           options={{ headerShown: false }} // Hide the header for the CameraZoom screen
         />
       </Stack.Navigator>

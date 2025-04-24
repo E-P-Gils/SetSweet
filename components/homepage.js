@@ -1,13 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome'; 
+import Icon from 'react-native-vector-icons/FontAwesome5';
 
-export default function HomePage({ navigation }) {
+export default function HomePage({ navigation, isLoggedIn, setIsLoggedIn }) {
   return (
     <View style={styles.container}>
         
      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('CameraZoom')}>
-        <Icon name="video-camera" size={20} color="white" style={styles.icon} />
+        <Icon name="video" size={20} color="white" style={styles.icon} />
         <Text style={styles.buttonText}>ViewFinder</Text>
       </TouchableOpacity>
             
@@ -16,7 +16,12 @@ export default function HomePage({ navigation }) {
         <Text style={styles.buttonText}>DigiSlate</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('ProjectScreen')}>
+        <Icon name="theater-masks" size={20} color="white" style={styles.icon} />
+        <Text style={styles.buttonText}>Projects</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('LoginForm')}>
         <Icon name="user" size={20} color="white" style={styles.icon} />
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
