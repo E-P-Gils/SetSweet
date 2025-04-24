@@ -30,33 +30,30 @@ export default function DigitalSlate({ navigation }) {
     SYNC_MOS: 'SYNC',
   });
 
-  // Load sound once
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
+
+  const handleClap = async () => {
+    try {
       const { sound } = await Audio.Sound.createAsync(
-        require('../assets/slateclapper.mp3'),
-        { shouldPlay: false }
+        require('../assets/slateclapper.mp3')
       );
-      if (isMounted) soundRef.current = sound;
-    })();
-
-    // Unload on unmount
-    return () => {
-      isMounted = false;
-      soundRef.current?.unloadAsync();
-    };
-  }, []);
-
-  const handleClap = () => {
-    // Play immediately – no await so UI stays snappy
-    soundRef.current?.replayAsync().catch(console.warn);
-
+      await sound.playAsync();
+      
+      // Set up a listener to unload the sound after it finishes playing
+      sound.setOnPlaybackStatusUpdate(async (status) => {
+        if (status.didJustFinish) {
+          await sound.unloadAsync();
+        }
+      });
+    } catch (error) {
+      console.error('Error playing clap sound:', error);
+    }
+  
     Animated.sequence([
       Animated.timing(clapAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
       Animated.timing(clapAnim, { toValue: 0, duration: 100, useNativeDriver: true })
     ]).start();
   };
+  
   
   const toggleSelection = (toggleCategory) => {
     setSelectedToggles((prevSelectedToggles) => {
