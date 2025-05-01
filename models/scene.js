@@ -1,20 +1,20 @@
 const mongoose = require('mongoose');
 
-const projectSchema = new mongoose.Schema({
+const sceneSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
     trim: true
   },
-  user: {
+  project: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Project',
     required: true
   },
-  scenes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Scene'
-  }],
+  notes: {
+    type: String,
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -25,9 +25,10 @@ const projectSchema = new mongoose.Schema({
   }
 });
 
-projectSchema.pre('save', function (next) {
+// Update the updatedAt timestamp before saving
+sceneSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model('Project', projectSchema);
+module.exports = mongoose.model('Scene', sceneSchema); 

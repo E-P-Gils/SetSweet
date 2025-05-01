@@ -1,8 +1,34 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 
-export default function HomePage({ navigation, isLoggedIn, setIsLoggedIn }) {
+export default function HomePage({ navigation, isLoggedIn, onLogout }) {
+  const handleAuth = () => {
+    if (isLoggedIn) {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: () => {
+              onLogout();
+              navigation.navigate('Home');
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    } else {
+      navigation.navigate('LoginForm');
+    }
+  };
+
   return (
     <View style={styles.container}>
         
@@ -21,9 +47,9 @@ export default function HomePage({ navigation, isLoggedIn, setIsLoggedIn }) {
         <Text style={styles.buttonText}>Projects</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('LoginForm')}>
-        <Icon name="user" size={20} color="white" style={styles.icon} />
-        <Text style={styles.buttonText}>Login</Text>
+      <TouchableOpacity style={styles.button} onPress={handleAuth}>
+        <Icon name={isLoggedIn ? "sign-out-alt" : "user"} size={20} color="white" style={styles.icon} />
+        <Text style={styles.buttonText}>{isLoggedIn ? 'Logout' : 'Login'}</Text>
       </TouchableOpacity>
 
     </View>

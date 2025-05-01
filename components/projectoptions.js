@@ -4,7 +4,17 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
 export default function ProjectOptions({ navigation, route }) {
-  const { project } = route.params;   // project object passed from ProjectScreen
+  const { project, userData } = route.params;
+
+  const handleSceneNavigation = () => {
+    console.log('Navigating to Scenes with:', { project, userData });
+    navigation.navigate('Scenes', { 
+      project: { 
+        ...project, 
+        userData: userData || project.userData 
+      } 
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -13,7 +23,7 @@ export default function ProjectOptions({ navigation, route }) {
       <OptionBtn
         icon="list-ul"
         label="Scenes"
-        onPress={() => navigation.navigate('Scenes', { project })}
+        onPress={handleSceneNavigation}
       />
 
       <OptionBtn

@@ -10,44 +10,147 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import axios from 'axios';
+import Constants from 'expo-constants';
+
+// Use the same IP address as in router.js
+const LOCAL_IP = "192.168.1.3";
+
+const API_BASE_URL = __DEV__ 
+  ? `http://${LOCAL_IP}:3001/api`
+  : 'http://localhost:3001/api';
 
 export default function SceneScreen({ navigation, route }) {
-  /* If you navigated here with   navigation.navigate('SceneScreen', { project })  
-     you can pull the parent project like this ↓   */
   const { project } = route.params ?? {};
-
   const [scenes, setScenes] = useState([]);
   const [showInput, setShowInput] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef(null);
 
-  /* -------- focus the text box when it appears -------- */
+  // Fetch scenes when component mounts or project changes
   useEffect(() => {
-    if (showInput && inputRef.current) {
-      setTimeout(() => inputRef.current.focus(), 100);
+    console.log('SceneScreen mounted/updated with project:', project);
+    if (project?._id && project?.userData?.token) {
+      fetchScenes();
+    } else {
+      console.log('Missing required data:', {
+        hasProjectId: !!project?._id,
+        hasToken: !!project?.userData?.token
+      });
     }
-  }, [showInput]);
+  }, [project?._id, project?.userData?.token]);
 
-  /* -------- helpers -------- */
-  const addScene = () => {
+  const fetchScenes = async () => {
+    try {
+      setIsLoading(true);
+      console.log('Fetching scenes for project:', project._id);
+      console.log('Using token:', project.userData.token);
+      
+      const response = await axios.get(`${API_BASE_URL}/scenes/${project._id}`, {
+        headers: {
+          Authorization: `Bearer ${project.userData.token}`
+        }
+      });
+      
+      console.log('Scenes response:', response.data);
+      if (Array.isArray(response.data)) {
+        setScenes(response.data);
+      } else {
+        console.log('Invalid scenes data received:', response.data);
+        setScenes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching scenes:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      if (error.response?.status === 401) {
+        Alert.alert('Session Expired', 'Please log in again');
+        navigation.navigate('LoginForm');
+      } else {
+        Alert.alert('Error', 'Failed to load scenes');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addScene = async () => {
     const title = newTitle.trim();
     if (!title) {
       Alert.alert('Please enter a scene title / slug');
       return;
     }
 
-    setScenes(prev => [...prev, { id: Date.now().toString(), title }]);
-    setNewTitle('');
-    setShowInput(false);
+    if (!project.userData?.token) {
+      Alert.alert('Error', 'Authentication token not found');
+      return;
+    }
+
+    try {
+      console.log('Creating scene with data:', { title, projectId: project._id });
+      console.log('Using token:', project.userData.token);
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/scenes`,
+        { 
+          title,
+          projectId: project._id
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${project.userData.token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Scene creation response:', response.data);
+      
+      if (response.data) {
+        setScenes(prev => [...prev, response.data]);
+        setNewTitle('');
+        setShowInput(false);
+      }
+    } catch (error) {
+      console.error('Error creating scene:', error);
+      console.error('Error response:', error.response?.data);
+      
+      if (error.response?.status === 401) {
+        Alert.alert('Session Expired', 'Please log in again');
+        navigation.navigate('LoginForm');
+      } else {
+        Alert.alert(
+          'Error', 
+          error.response?.data?.message || 'Failed to create scene. Please try again.'
+        );
+      }
+    }
   };
 
-  const deleteScene = (id) => {
+  const deleteScene = async (sceneId) => {
     Alert.alert('Delete Scene', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => setScenes(prev => prev.filter(s => s.id !== id)),
+        onPress: async () => {
+          try {
+            await axios.delete(`${API_BASE_URL}/scenes/${sceneId}`, {
+              headers: {
+                Authorization: `Bearer ${project.userData?.token}`
+              }
+            });
+            setScenes(prev => prev.filter(s => s._id !== sceneId));
+          } catch (error) {
+            console.error('Error deleting scene:', error);
+            Alert.alert('Error', 'Failed to delete scene');
+          }
+        },
       },
     ]);
   };
@@ -61,14 +164,14 @@ export default function SceneScreen({ navigation, route }) {
         {project ? `${project.title} – Scenes` : 'Scenes'}
       </Text>
 
-      {!showInput && scenes.length === 0 && (
+      {!showInput && scenes.length === 0 && !isLoading && (
         <Text style={styles.emptyText}>Press + to create a new scene</Text>
       )}
 
       <View style={styles.listContainer}>
         <FlatList
           data={scenes}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item._id}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <TouchableOpacity
@@ -78,7 +181,7 @@ export default function SceneScreen({ navigation, route }) {
                 <Text style={styles.cardText}>{item.title}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => deleteScene(item.id)}>
+              <TouchableOpacity onPress={() => deleteScene(item._id)}>
                 <Icon name="trash" size={20} color="#fff" />
               </TouchableOpacity>
             </View>

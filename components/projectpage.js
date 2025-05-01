@@ -10,12 +10,28 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import axios from 'axios';
+import Constants from 'expo-constants';
 
-export default function ProjectScreen({ navigation }) {
+// Use the same IP address as in router.js
+const LOCAL_IP = "192.168.1.3";
+
+const API_BASE_URL = __DEV__ 
+  ? `http://${LOCAL_IP}:3001/api`
+  : 'http://localhost:3001/api';
+
+export default function ProjectScreen({ navigation, isLoggedIn, userData }) {
   const [projects, setProjects] = useState([]);
   const [showInput, setShowInput] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const inputRef = useRef(null);
+
+  // Fetch user's projects when component mounts or userData changes
+  useEffect(() => {
+    if (isLoggedIn && userData) {
+      fetchProjects();
+    }
+  }, [isLoggedIn, userData]);
 
   // Focus input when modal is shown
   useEffect(() => {
@@ -26,32 +42,128 @@ export default function ProjectScreen({ navigation }) {
     }
   }, [showInput]);
 
-  // ---------- helpers ----------
-  const addProject = () => {
+  const fetchProjects = async () => {
+    try {
+      if (!userData?.token) {
+        console.log('No token available');
+        setProjects([]);
+        return;
+      }
+
+      console.log('Fetching projects with token:', userData.token);
+      const response = await axios.get(`${API_BASE_URL}/projects`, {
+        headers: {
+          Authorization: `Bearer ${userData.token}`
+        }
+      });
+
+      console.log('Projects response:', response.data);
+      if (Array.isArray(response.data)) {
+        setProjects(response.data);
+      } else {
+        console.log('Response data is not an array:', response.data);
+        setProjects([]);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      if (error.response?.status === 401) {
+        // Token is invalid or expired
+        Alert.alert('Session Expired', 'Please log in again');
+        navigation.navigate('LoginForm');
+      } else if (error.response?.status === 404) {
+        // No projects found
+        setProjects([]);
+      } else {
+        Alert.alert('Error', 'Failed to load projects');
+        setProjects([]);
+      }
+    }
+  };
+
+  const addProject = async () => {
+    if (!isLoggedIn) {
+      Alert.alert('Login Required', 'You must be logged in to create a project');
+      setShowInput(false);
+      return;
+    }
+
     const title = newTitle.trim();
     if (!title) {
       Alert.alert('Please enter a project title');
       return;
     }
 
-    setProjects(prev => [...prev, { id: Date.now().toString(), title }]);
-    setNewTitle('');
-    setShowInput(false);
+    try {
+      console.log('Creating project with data:', { title, user: userData._id });
+      console.log('Auth token:', userData.token);
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/projects`,
+        { 
+          title,
+          user: userData._id // Make sure to send the user ID
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${userData.token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Project creation response:', response.data);
+
+      if (response.data) {
+        setProjects(prev => [...prev, response.data]);
+        setNewTitle('');
+        setShowInput(false);
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      console.error('Error response:', error.response?.data);
+      Alert.alert(
+        'Error', 
+        error.response?.data?.message || 'Failed to create project. Please try again.'
+      );
+    }
   };
 
-  const deleteProject = (id) => {
+  const deleteProject = async (id) => {
     Alert.alert('Delete Project', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () =>
-          setProjects((prev) => prev.filter((proj) => proj.id !== id)),
+        onPress: async () => {
+          try {
+            await axios.delete(`${API_BASE_URL}/projects/${id}`, {
+              headers: {
+                Authorization: `Bearer ${userData.token}`
+              }
+            });
+            setProjects(prev => prev.filter(proj => proj._id !== id));
+          } catch (error) {
+            console.error('Error deleting project:', error);
+            Alert.alert('Error', 'Failed to delete project');
+          }
+        },
       },
     ]);
   };
 
-  const handleInputToggle = () => setShowInput(s => !s);
+  const handleInputToggle = () => {
+    if (!isLoggedIn) {
+      Alert.alert('Login Required', 'You must be logged in to create a project');
+      return;
+    }
+    setShowInput(s => !s);
+  };
 
   // ---------- render ----------
   return (
@@ -65,19 +177,19 @@ export default function ProjectScreen({ navigation }) {
       <View style={styles.listContainer}>
         <FlatList
           data={projects}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <TouchableOpacity
                 style={styles.cardLeft}
                 onPress={() =>
-                  navigation.navigate('ProjectOptions', { project: item })
+                  navigation.navigate('ProjectOptions', { project: item, userData })
                 }>
                 <Icon name="film" size={18} color="#fff" style={styles.cardIcon} />
                 <Text style={styles.cardText}>{item.title}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => deleteProject(item.id)}>
+              <TouchableOpacity onPress={() => deleteProject(item._id)}>
                 <Icon name="trash" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
