@@ -7,10 +7,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const Scene = require('./models/scene');
+const app = express();
 
 const PORT = 3001;
-const LOCAL_IP ="REPLACEWITHIP";
-const app = express();
+const LOCAL_IP ="REPLACEWITHIP"; 
+// const app = express();
 
 // Middleware to handle JSON and URL-encoded data
 app.use(cors({
