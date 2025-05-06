@@ -22,7 +22,7 @@
     "aws-sdk": "^2.1692.0",
     "axios": "^1.8.1",
     "bcrypt": "^5.1.1",
-    "expo": "~52.0.35",
+    "expo": "^52.0.0",
     "expo-av": "~15.0.2",
     "expo-camera": "~16.0.18",
     "expo-constants": "^17.0.8",
@@ -51,9 +51,12 @@
     "react-native-screens": "~4.4.0",
     "react-native-slider": "^0.11.0",
     "react-native-sound": "^0.11.2",
+    "react-native-svg": "^15.11.2",
     "react-native-vector-icons": "^10.2.0",
     "react-native-volume-controller": "^1.2.1",
-    "react-native-web": "~0.19.13"
+    "react-native-web": "~0.19.13",
+    "react-rnd": "^10.5.2",
+    "styled-components": "^6.1.17"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^19.2.1",

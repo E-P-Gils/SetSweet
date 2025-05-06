@@ -1,10 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useState } from 'react';
-import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image } from 'react-native'; 
+import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image, Modal, Dimensions } from 'react-native'; 
 import { PinchGestureHandler } from 'react-native-gesture-handler'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
 import Icon from 'react-native-vector-icons/FontAwesome'; 
-import { Dimensions } from 'react-native';
 
 export default function CameraZoom({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -30,10 +29,29 @@ export default function CameraZoom({ navigation }) {
   if (!permission) return <View />;
   if (!permission.granted) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button onPress={requestPermission} title="Grant Permission" />
-      </View>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={true}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Icon name="camera" size={50} color="#007AFF" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Camera Access Required</Text>
+            <Text style={styles.modalText}>
+              We need access to your camera to provide the camera zoom functionality.
+              Your privacy is important to us - we only use the camera when you're actively using this feature.
+            </Text>
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={requestPermission}
+            >
+              <Text style={styles.permissionButtonText}>Grant Camera Access</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     );
   }
 
@@ -256,5 +274,57 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'flex-end',
     paddingBottom: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalIcon: {
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#000',
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  permissionButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    width: '100%',
+  },
+  permissionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

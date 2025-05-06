@@ -13,6 +13,7 @@ import ProjectOptions from './components/projectoptions';
 import Scenes from './components/scenes';
 import SceneOptions from './components/sceneoptions';
 import Notes from './components/notes';
+import Floorplan from './components/floorplan';
 
 const Stack = createNativeStackNavigator();
 
@@ -132,6 +133,11 @@ export default function App() {
         <Stack.Screen 
           name="Notes" 
           component={Notes}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="FloorPlanScreen" 
+          component={Floorplan}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

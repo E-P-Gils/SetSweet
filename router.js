@@ -10,7 +10,7 @@ const Scene = require('./models/scene');
 const app = express();
 
 const PORT = 3001;
-const LOCAL_IP ="REPLACEWITHIP"; 
+const LOCAL_IP ="REPLACEWITHLOCALIP"; 
 // const app = express();
 
 // Middleware to handle JSON and URL-encoded data
