@@ -15,6 +15,20 @@ const sceneSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  floorplan: {
+    shapes: [{
+      id: Number,
+      type: String,
+      x: Number,
+      y: Number,
+      width: Number,
+      height: Number,
+      rotation: Number,
+      color: String,
+      name: String
+    }],
+    paths: [String]
+  },
   createdAt: {
     type: Date,
     default: Date.now
