@@ -7,10 +7,12 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const Scene = require('./models/scene');
+const multer = require('multer');
+const fs = require('fs');
 const app = express();
 
 const PORT = 3001;
-const LOCAL_IP ="REPLACEWITHLOCALIP";
+const LOCAL_IP ="REPLACEWITHIP";
 // const app = express();
 
 // Middleware to handle JSON and URL-encoded data
@@ -29,12 +31,60 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/scripts';
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with original extension
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'script-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: function (req, file, cb) {
+    // Accept only PDF files
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 // MongoDB connection
 mongoose.connect('mongodb://localhost:27017/setsweet')
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
 const router = express.Router();
+
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, 'your-secret-key');
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+};
 
 // Get all users
 router.get('/users', async (req, res) => {
@@ -384,6 +434,87 @@ router.delete('/scenes/:sceneId', async (req, res) => {
   } catch (error) {
     console.error('Error deleting scene:', error);
     res.status(500).json({ message: 'Error deleting scene', error: error.message });
+  }
+});
+
+// Add static file serving for uploads
+app.use('/uploads', express.static('uploads'));
+
+// Script routes
+router.get('/projects/:projectId/script', verifyToken, async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Verify project belongs to user
+    if (project.user.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    res.json({ scriptUrl: project.scriptUrl });
+  } catch (error) {
+    console.error('Error fetching script:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/projects/:projectId/script', verifyToken, upload.single('script'), async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Verify project belongs to user
+    if (project.user.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Update project with script URL
+    project.scriptUrl = `/uploads/scripts/${req.file.filename}`;
+    await project.save();
+
+    res.json({ scriptUrl: project.scriptUrl });
+  } catch (error) {
+    console.error('Error uploading script:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete script
+router.delete('/projects/:projectId/script', verifyToken, async (req, res) => {
+  try {
+    const project = await Project.findOne({
+      _id: req.params.projectId,
+      userId: req.userId
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    if (project.scriptUrl) {
+      // Delete the file from the uploads directory
+      const filePath = path.join(__dirname, project.scriptUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // Update project to remove script URL
+    project.scriptUrl = null;
+    await project.save();
+
+    res.status(200).json({ message: 'Script deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting script:', error);
+    res.status(500).json({ message: 'Error deleting script' });
   }
 });
 

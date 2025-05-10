@@ -11,6 +11,10 @@ const projectSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  scriptUrl: {
+    type: String,
+    default: null
+  },
   scenes: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Scene'

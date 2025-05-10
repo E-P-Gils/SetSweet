@@ -16,6 +16,33 @@ export default function ProjectOptions({ navigation, route }) {
     });
   };
 
+  const handleScriptNavigation = () => {
+    console.log('Starting Script navigation...');
+    console.log('Current navigation state:', navigation.getState());
+    console.log('Navigating to Script with:', { project, userData });
+    try {
+      navigation.push('Script', { 
+        project: {
+          ...project,
+          userData: userData || project.userData
+        }
+      });
+      console.log('Navigation command executed');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      try {
+        navigation.navigate('Script', { 
+          project: {
+            ...project,
+            userData: userData || project.userData
+          }
+        });
+      } catch (fallbackError) {
+        console.error('Fallback navigation error:', fallbackError);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>{project.title}</Text>
@@ -35,7 +62,7 @@ export default function ProjectOptions({ navigation, route }) {
       <OptionBtn
         icon="file-text-o"
         label="Script"
-        onPress={() => navigation.navigate('ScriptScreen', { project })}
+        onPress={handleScriptNavigation}
       />
 
       <OptionBtn
@@ -48,22 +75,20 @@ export default function ProjectOptions({ navigation, route }) {
 }
 
 /* ---------- tiny sub‑component ---------- */
-function OptionBtn({ icon, label, onPress }) {
-  return (
-    <TouchableOpacity style={styles.btn} onPress={onPress}>
-      <Icon name={icon} size={20} color="#fff" style={styles.icon} />
-      <Text style={styles.btnText}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
+const OptionBtn = ({ icon, label, onPress }) => (
+  <TouchableOpacity style={styles.optionBtn} onPress={onPress}>
+    <Icon name={icon} size={24} color="#fff" style={styles.optionIcon} />
+    <Text style={styles.optionText}>{label}</Text>
+  </TouchableOpacity>
+);
 
 /* ---------- styles ---------- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#00B5B8',
+    paddingTop: 60,
     paddingHorizontal: 20,
-    justifyContent: 'center',
+    backgroundColor: '#00B5B8',
     alignItems: 'center',
   },
   header: {
@@ -71,17 +96,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 40,
-    textAlign: 'center',
   },
-  btn: {
+  optionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8A8B8',
-    width: '100%',
     padding: 15,
     borderRadius: 10,
-    marginVertical: 10,
+    width: '100%',
+    marginBottom: 15,
   },
-  icon: { marginRight: 12 },
-  btnText: { color: '#fff', fontSize: 18 },
+  optionIcon: {
+    marginRight: 15,
+  },
+  optionText: {
+    color: '#fff',
+    fontSize: 18,
+  },
 });
