@@ -57,7 +57,7 @@ const SHAPES = [
   { "type": "window", "icon": "columns", "color": "#b5ead7", "label": "Window" },
   { "type": "drink", "icon": "coffee", "color": "#dec3c3", "label": "Drink" },
   { "type": "blood", "icon": "tint", "color": "#900", "label": "Blood" },
-  { "type": "corpse", "icon": "user-slash", "color": "#555", "label": "Corpse" },
+  { "type": "corpse", "icon": "user-times", "color": "#555", "label": "Corpse" },
   { "type": "knife", "icon": "cut", "color": "#c33", "label": "Knife" },
   { "type": "doll", "icon": "child", "color": "#cfc", "label": "Creepy Doll" },
   { "type": "mirror", "icon": "circle-o", "color": "#ccd", "label": "Haunted Mirror" },
@@ -95,7 +95,7 @@ const generateRandomColor = () => {
 };
 
 const Floorplan = ({ navigation, route }) => {
-  const { scene } = route.params;
+  const { scene, project } = route.params;
   const [shapes, setShapes] = useState([]);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [currentPath, setCurrentPath] = useState('');
@@ -104,36 +104,134 @@ const Floorplan = ({ navigation, route }) => {
   const [isNameModalVisible, setIsNameModalVisible] = useState(false);
   const [currentName, setCurrentName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [currentScene, setCurrentScene] = useState(scene);
   const nextId = useSharedValue(1);
 
-  // Load saved floorplan data when component mounts
-  useEffect(() => {
-    if (scene.floorplan) {
-      if (scene.floorplan.shapes) {
-        setShapes(scene.floorplan.shapes);
-        // Set nextId to the highest shape ID + 1
-        const maxId = Math.max(...scene.floorplan.shapes.map(s => s.id), 0);
-        nextId.value = maxId + 1;
+  // Fetch latest scene data when component mounts
+  const fetchSceneData = async () => {
+    try {
+      const token = scene.token || project?.userData?.token;
+      if (!token) {
+        throw new Error('No authentication token available');
       }
-      if (scene.floorplan.paths) {
-        setPaths(scene.floorplan.paths);
-      }
+
+      console.log('Fetching latest scene data for:', scene._id);
+      const response = await axios.get(`${API_BASE_URL}/scenes/${scene._id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log('Received scene data:', JSON.stringify(response.data, null, 2));
+      setCurrentScene(response.data);
+    } catch (error) {
+      console.error('Error fetching scene data:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load floorplan data. Please try again.'
+      );
     }
-  }, [scene]);
+  };
+
+  // Load saved floorplan data when component mounts or scene data updates
+  useEffect(() => {
+    console.log('Loading floorplan data from scene:', JSON.stringify(currentScene, null, 2));
+    if (currentScene.floorplan) {
+      console.log('Found floorplan data:', JSON.stringify(currentScene.floorplan, null, 2));
+      if (currentScene.floorplan.shapes) {
+        console.log('Loading shapes:', JSON.stringify(currentScene.floorplan.shapes, null, 2));
+        // Ensure shapes are properly formatted
+        const formattedShapes = currentScene.floorplan.shapes.map(shape => ({
+          id: Number(shape.id),
+          type: String(shape.type),
+          x: Number(shape.x),
+          y: Number(shape.y),
+          width: Number(shape.width),
+          height: Number(shape.height),
+          rotation: Number(shape.rotation),
+          color: String(shape.color),
+          name: String(shape.name || '')
+        }));
+        console.log('Formatted shapes:', JSON.stringify(formattedShapes, null, 2));
+        setShapes(formattedShapes);
+        // Set nextId to the highest shape ID + 1
+        const maxId = Math.max(...formattedShapes.map(s => s.id), 0);
+        nextId.value = maxId + 1;
+        console.log('Set nextId to:', nextId.value);
+      }
+      if (currentScene.floorplan.paths) {
+        console.log('Loading paths:', currentScene.floorplan.paths);
+        setPaths(currentScene.floorplan.paths);
+      }
+    } else {
+      console.log('No floorplan data found in scene');
+      setShapes([]);
+      setPaths([]);
+    }
+  }, [currentScene]);
+
+  // Fetch scene data when component mounts
+  useEffect(() => {
+    fetchSceneData();
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await axios.put(`${API_BASE_URL}/scenes/${scene._id}`, {
-        floorplan: {
-          shapes,
-          paths
+      const token = scene.token || project?.userData?.token;
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Ensure shapes are properly formatted before saving
+      const formattedShapes = shapes.map(shape => ({
+        id: Number(shape.id),
+        type: String(shape.type),
+        x: Number(shape.x),
+        y: Number(shape.y),
+        width: Number(shape.width),
+        height: Number(shape.height),
+        rotation: Number(shape.rotation),
+        color: String(shape.color),
+        name: String(shape.name || '')
+      }));
+
+      const floorplanData = {
+        shapes: formattedShapes,
+        paths: paths
+      };
+
+      console.log('Saving floorplan for scene:', scene._id);
+      console.log('Floorplan data:', JSON.stringify(floorplanData, null, 2));
+      
+      const response = await axios.put(`${API_BASE_URL}/scenes/${scene._id}/floorplan`, {
+        floorplan: floorplanData
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
-      Alert.alert('Success', 'Floorplan saved successfully');
+
+      if (response.status === 200) {
+        console.log('Save successful, received updated scene:', JSON.stringify(response.data, null, 2));
+        // Update the local scene data with the response
+        setCurrentScene(response.data);
+        Alert.alert('Success', 'Floorplan saved successfully');
+      } else {
+        throw new Error('Failed to save floorplan');
+      }
     } catch (error) {
       console.error('Error saving floorplan:', error);
-      Alert.alert('Error', 'Failed to save floorplan');
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      Alert.alert(
+        'Error',
+        error.response?.data?.message || 'Failed to save floorplan. Please try again.'
+      );
     } finally {
       setIsSaving(false);
     }

@@ -6,6 +6,18 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 export default function SceneOptions({ navigation, route }) {
   const { scene, project } = route.params; // scene object passed from SceneScreen
 
+  const handleFloorplanNavigation = () => {
+    // Ensure we pass the complete scene data including floorplan
+    navigation.navigate('FloorPlanScreen', { 
+      scene: {
+        ...scene,
+        floorplan: scene.floorplan || { shapes: [], paths: [] },
+        token: project.userData?.token
+      }, 
+      project 
+    });
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>{scene.title}</Text>
@@ -21,9 +33,7 @@ export default function SceneOptions({ navigation, route }) {
       <OptionBtn
         icon="th-large"
         label="FloorPlan"
-        onPress={() =>
-          navigation.navigate('FloorPlanScreen', { scene, project })
-        }
+        onPress={handleFloorplanNavigation}
       />
 
       <OptionBtn

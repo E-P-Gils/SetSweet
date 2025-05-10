@@ -220,7 +220,7 @@ router.delete('/projects/:id', async (req, res) => {
 });
 
 // Scene routes
-router.post('/scenes', async (req, res) => {
+router.get('/scenes/:id', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
@@ -228,55 +228,28 @@ router.post('/scenes', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, 'your-secret-key');
-    const { title, projectId } = req.body;
+    const { id } = req.params;
 
-    if (!title || !projectId) {
-      return res.status(400).json({ message: 'Title and project ID are required' });
+    // Check if the ID is a valid MongoDB ObjectId
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      // If it's a valid ObjectId, try to find a single scene
+      const scene = await Scene.findById(id).populate('project');
+      if (scene) {
+        if (scene.project.user.toString() !== decoded.userId) {
+          return res.status(403).json({ message: 'Unauthorized' });
+        }
+        return res.json(scene);
+      }
     }
 
-    // Verify project belongs to user
-    const project = await Project.findOne({ _id: projectId, user: decoded.userId });
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    // Create new scene
-    const scene = await Scene.create({
-      title,
-      project: projectId
-    });
-
-    // Add scene to project's scenes array
-    await Project.findByIdAndUpdate(
-      projectId,
-      { $push: { scenes: scene._id } }
-    );
-
-    res.status(201).json(scene);
-  } catch (error) {
-    console.error('Error creating scene:', error);
-    res.status(500).json({ message: 'Error creating scene', error: error.message });
-  }
-});
-
-router.get('/scenes/:projectId', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, 'your-secret-key');
-    const { projectId } = req.params;
-
-    // Verify project belongs to user
-    const project = await Project.findOne({ _id: projectId, user: decoded.userId });
+    // If not a valid ObjectId or scene not found, try to find scenes by project
+    const project = await Project.findOne({ _id: id, user: decoded.userId });
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
     // Get all scenes for the project
-    const scenes = await Scene.find({ project: projectId })
+    const scenes = await Scene.find({ project: id })
       .sort({ createdAt: -1 });
 
     res.json(scenes);
@@ -315,6 +288,66 @@ router.put('/scenes/:sceneId/notes', async (req, res) => {
   } catch (error) {
     console.error('Error updating scene notes:', error);
     res.status(500).json({ message: 'Error updating scene notes', error: error.message });
+  }
+});
+
+router.put('/scenes/:sceneId/floorplan', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, 'your-secret-key');
+    const { sceneId } = req.params;
+    const { floorplan } = req.body;
+
+    console.log('Updating floorplan for scene:', sceneId);
+    console.log('Received floorplan data:', JSON.stringify(floorplan, null, 2));
+
+    // Validate floorplan data structure
+    if (!floorplan || !Array.isArray(floorplan.shapes) || !Array.isArray(floorplan.paths)) {
+      return res.status(400).json({ 
+        message: 'Invalid floorplan data structure',
+        expected: {
+          shapes: [{
+            id: 'Number',
+            type: 'String',
+            x: 'Number',
+            y: 'Number',
+            width: 'Number',
+            height: 'Number',
+            rotation: 'Number',
+            color: 'String',
+            name: 'String'
+          }],
+          paths: ['String']
+        }
+      });
+    }
+
+    // Find scene and verify it belongs to user's project
+    const scene = await Scene.findById(sceneId).populate('project');
+    if (!scene) {
+      return res.status(404).json({ message: 'Scene not found' });
+    }
+
+    if (scene.project.user.toString() !== decoded.userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    // Update scene floorplan - pass the shapes array directly without stringifying
+    scene.floorplan = {
+      shapes: floorplan.shapes,
+      paths: floorplan.paths
+    };
+
+    await scene.save();
+    console.log('Floorplan updated successfully');
+    res.json(scene);
+  } catch (error) {
+    console.error('Error updating scene floorplan:', error);
+    res.status(500).json({ message: 'Error updating scene floorplan', error: error.message });
   }
 });
 

@@ -1,5 +1,17 @@
 const mongoose = require('mongoose');
 
+const shapeSchema = new mongoose.Schema({
+  id: { type: Number, required: true },
+  type: { type: String, required: true },
+  x: { type: Number, required: true },
+  y: { type: Number, required: true },
+  width: { type: Number, required: true },
+  height: { type: Number, required: true },
+  rotation: { type: Number, required: true },
+  color: { type: String, required: true },
+  name: { type: String, default: '' }
+}, { _id: false });
+
 const sceneSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -16,18 +28,8 @@ const sceneSchema = new mongoose.Schema({
     default: ''
   },
   floorplan: {
-    shapes: [{
-      id: Number,
-      type: String,
-      x: Number,
-      y: Number,
-      width: Number,
-      height: Number,
-      rotation: Number,
-      color: String,
-      name: String
-    }],
-    paths: [String]
+    shapes: { type: [shapeSchema], default: [] },
+    paths: { type: [String], default: [] }
   },
   createdAt: {
     type: Date,
