@@ -66,13 +66,19 @@ export default function Script({ navigation, route }) {
 
   const handleUpload = async () => {
     try {
+      console.log('Starting document picker...');
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true
       });
 
+      console.log('DocumentPicker result:', result);
+      
       if (result.type === 'success') {
+        console.log('Document selected:', result);
         await uploadScript(result.uri);
+      } else if (result.type === 'cancel') {
+        console.log('Document picker cancelled');
       }
     } catch (error) {
       console.error('Error picking document:', error);
@@ -87,6 +93,7 @@ export default function Script({ navigation, route }) {
       
       const token = project.userData?.token;
       if (!token) {
+        console.error('No token found');
         Alert.alert('Error', 'Please log in again');
         navigation.navigate('LoginForm');
         return;
@@ -99,7 +106,9 @@ export default function Script({ navigation, route }) {
         name: 'script.pdf'
       });
 
-      console.log('Sending upload request to:', `${API_BASE_URL}/projects/${project._id}/script`);
+      console.log('FormData contents:', formData._parts);
+      console.log('Project ID:', project._id);
+      console.log('API Base URL:', API_BASE_URL);
       
       const response = await axios.post(
         `${API_BASE_URL}/projects/${project._id}/script`,
@@ -115,7 +124,6 @@ export default function Script({ navigation, route }) {
       console.log('Upload response:', response.data);
 
       if (response.data.scriptUrl) {
-        // Add timestamp to prevent caching
         const fullUrl = `${API_BASE_URL.replace('/api', '')}${response.data.scriptUrl}?t=${Date.now()}`;
         console.log('Final full URL used for WebView:', fullUrl);
 
@@ -126,14 +134,12 @@ export default function Script({ navigation, route }) {
             responseType: 'blob'
           });
           console.log('URL verification successful:', verifyResponse.status === 200);
+          setScriptUrl(fullUrl);
+          Alert.alert('Success', 'Script uploaded successfully');
         } catch (verifyError) {
           console.error('URL verification failed:', verifyError);
           Alert.alert('Error', 'Uploaded file is not accessible');
-          return;
         }
-
-        setScriptUrl(fullUrl);
-        Alert.alert('Success', 'Script uploaded successfully');
       } else {
         console.error('No scriptUrl in response:', response.data);
         Alert.alert('Error', 'Failed to get script URL from server');
@@ -219,6 +225,16 @@ export default function Script({ navigation, route }) {
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>Script</Text>
+      </View>
+
+      {/* Debug Info */}
+      <View style={styles.debugContainer}>
+        <Text style={styles.debugText}>
+          Script URL: {scriptUrl ? 'Set' : 'Not Set'}
+        </Text>
+        <Text style={styles.debugText}>
+          Upload Status: {isUploading ? 'Uploading...' : 'Ready'}
+        </Text>
       </View>
 
       {scriptUrl ? (
@@ -369,5 +385,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+  },
+  debugContainer: {
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    margin: 10,
+    borderRadius: 5,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 12,
+    marginBottom: 5,
   },
 }); 
