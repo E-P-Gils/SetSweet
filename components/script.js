@@ -83,6 +83,8 @@ export default function Script({ navigation, route }) {
   const uploadScript = async (uri) => {
     try {
       setIsUploading(true);
+      console.log('Starting upload process with URI:', uri);
+      
       const token = project.userData?.token;
       if (!token) {
         Alert.alert('Error', 'Please log in again');
@@ -97,6 +99,8 @@ export default function Script({ navigation, route }) {
         name: 'script.pdf'
       });
 
+      console.log('Sending upload request to:', `${API_BASE_URL}/projects/${project._id}/script`);
+      
       const response = await axios.post(
         `${API_BASE_URL}/projects/${project._id}/script`,
         formData,
@@ -108,12 +112,37 @@ export default function Script({ navigation, route }) {
         }
       );
 
+      console.log('Upload response:', response.data);
+
       if (response.data.scriptUrl) {
-        setScriptUrl(response.data.scriptUrl);
+        // Add timestamp to prevent caching
+        const fullUrl = `${API_BASE_URL.replace('/api', '')}${response.data.scriptUrl}?t=${Date.now()}`;
+        console.log('Final full URL used for WebView:', fullUrl);
+
+        // Verify the URL is accessible
+        try {
+          const verifyResponse = await axios.get(fullUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+            responseType: 'blob'
+          });
+          console.log('URL verification successful:', verifyResponse.status === 200);
+        } catch (verifyError) {
+          console.error('URL verification failed:', verifyError);
+          Alert.alert('Error', 'Uploaded file is not accessible');
+          return;
+        }
+
+        setScriptUrl(fullUrl);
         Alert.alert('Success', 'Script uploaded successfully');
+      } else {
+        console.error('No scriptUrl in response:', response.data);
+        Alert.alert('Error', 'Failed to get script URL from server');
       }
     } catch (error) {
       console.error('Error uploading script:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+      }
       if (error.response?.status === 401) {
         Alert.alert('Session Expired', 'Please log in again');
         navigation.navigate('LoginForm');
@@ -195,8 +224,29 @@ export default function Script({ navigation, route }) {
       {scriptUrl ? (
         <View style={styles.pdfContainer}>
           <WebView
+            key={scriptUrl}
             source={{ uri: scriptUrl }}
             style={styles.pdfViewer}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('WebView error:', nativeEvent);
+              Alert.alert('Error', `Failed to load PDF: ${nativeEvent.description}`);
+            }}
+            onLoad={() => console.log('PDF loaded successfully')}
+            onLoadStart={() => console.log('PDF loading started')}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('WebView HTTP error:', nativeEvent);
+            }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            scalesPageToFit={true}
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#F8A8B8" />
+              </View>
+            )}
           />
           <View style={styles.buttonContainer}>
             <TouchableOpacity
@@ -261,9 +311,13 @@ const styles = StyleSheet.create({
     margin: 20,
     borderRadius: 10,
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   pdfViewer: {
     flex: 1,
+    height: '100%',
+    backgroundColor: '#fff',
   },
   uploadContainer: {
     flex: 1,
@@ -305,5 +359,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
   },
 }); 
