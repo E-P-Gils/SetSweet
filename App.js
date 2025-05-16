@@ -15,6 +15,7 @@ import SceneOptions from './components/sceneoptions';
 import Notes from './components/notes';
 import Floorplan from './components/floorplan';
 import Script from './components/script';
+import SavedSlates from './components/savedslates';
 
 const Stack = createNativeStackNavigator();
 
@@ -137,25 +138,20 @@ export default function App() {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
-          name="FloorPlanScreen" 
+          name="Floorplan" 
           component={Floorplan}
           options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="Script" 
-          options={{ 
-            headerShown: false,
-            animation: 'slide_from_right'
-          }}
-        >
-          {props => (
-            <Script 
-              {...props} 
-              isLoggedIn={isLoggedIn} 
-              userData={userData}
-            />
-          )}
-        </Stack.Screen>
+          component={Script}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="SavedSlates" 
+          component={SavedSlates}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
       <StatusBar hidden />
     </NavigationContainer>

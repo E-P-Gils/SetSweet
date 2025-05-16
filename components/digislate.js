@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image, Modal, FlatList, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config';
 
 const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
 const topClapperColors = ['#f7ec13', '#00a94f', '#0072ce', '#e30613', '#ffffff', '#a0a0a0', '#4a4a4a', '#000'];
@@ -12,16 +14,18 @@ const VerticalLabel = ({ label }) => (
   </View>
 );
 
-const SlateInput = ({ placeholder, big, style, ...props }) => (
+const SlateInput = ({ placeholder, big, style, value, onChangeText, ...props }) => (
   <TextInput
     style={[styles.inputField, big && styles.bigInputField, style]}
     placeholder={placeholder}
     placeholderTextColor="#888"
+    value={value}
+    onChangeText={onChangeText}
     {...props}
   />
 );
 
-export default function DigitalSlate({ navigation }) {
+export default function DigitalSlate({ navigation, route }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
   const soundRef = useRef(null);
   const [selectedToggles, setSelectedToggles] = useState({
@@ -30,6 +34,83 @@ export default function DigitalSlate({ navigation }) {
     SYNC_MOS: 'SYNC',
   });
 
+  // Add state for all input fields
+  const [slateData, setSlateData] = useState({
+    roll: '',
+    scene: '',
+    take: '',
+    prod: '',
+    dir: '',
+    cam: '',
+    fps: '',
+    date: '',
+  });
+
+  // Add state for project selection modal
+  const [isProjectModalVisible, setIsProjectModalVisible] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // Add debounce timer ref
+  const saveTimerRef = useRef(null);
+
+  // Load saved data when component mounts
+  useEffect(() => {
+    loadSavedData();
+  }, []);
+
+  // Save data whenever it changes
+  useEffect(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      saveData();
+    }, 1000); // Debounce for 1 second
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [slateData, selectedToggles]);
+
+  const loadSavedData = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem('slateData');
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        setSlateData(parsedData.slateData || {});
+        setSelectedToggles(parsedData.selectedToggles || {
+          INT_EXT: 'INT',
+          DAY_NITE: 'DAY',
+          SYNC_MOS: 'SYNC',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading saved slate data:', error);
+    }
+  };
+
+  const saveData = async () => {
+    try {
+      const dataToSave = {
+        slateData,
+        selectedToggles,
+      };
+      await AsyncStorage.setItem('slateData', JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error('Error saving slate data:', error);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setSlateData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleClap = async () => {
     try {
@@ -67,6 +148,115 @@ export default function DigitalSlate({ navigation }) {
     });
   };
 
+  const handleSavePress = async () => {
+    try {
+      setIsLoading(true);
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        Alert.alert('Error', 'Please log in to save slates');
+        navigation.navigate('LoginForm');
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      const response = await fetch(`${API_BASE_URL}/projects`, {
+        headers: {
+          'Authorization': `Bearer ${parsedUserData.token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+
+      const projectsData = await response.json();
+      setProjects(projectsData);
+      setIsProjectModalVisible(true);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      Alert.alert('Error', 'Failed to load projects');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProjectSelect = async (project) => {
+    try {
+      setIsLoading(true);
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        Alert.alert('Error', 'Please log in to save slates');
+        navigation.navigate('LoginForm');
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      console.log('User data:', parsedUserData);
+
+      const slateToSave = {
+        roll: slateData.roll,
+        scene: slateData.scene,
+        take: slateData.take,
+        prod: slateData.prod,
+        dir: slateData.dir,
+        cam: slateData.cam,
+        fps: slateData.fps,
+        date: new Date().toISOString(),
+        toggles: {
+          INT_EXT: selectedToggles.INT_EXT,
+          DAY_NITE: selectedToggles.DAY_NITE,
+          SYNC_MOS: selectedToggles.SYNC_MOS
+        }
+      };
+
+      console.log('Saving slate data:', slateToSave);
+      console.log('To project:', project._id);
+      console.log('Using token:', parsedUserData.token);
+
+      const response = await fetch(
+        `${API_BASE_URL}/projects/${project._id}/slates`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${parsedUserData.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(slateToSave)
+        }
+      );
+
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`Failed to save slate: ${responseText}`);
+      }
+
+      const savedSlate = JSON.parse(responseText);
+      console.log('Saved slate:', savedSlate);
+
+      Alert.alert('Success', 'Slate saved successfully');
+      setSelectedProject(null);
+      setIsProjectModalVisible(false);
+    } catch (error) {
+      console.error('Error saving slate:', error);
+      Alert.alert('Error', error.message || 'Failed to save slate');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderProjectItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.projectItem}
+      onPress={() => handleProjectSelect(item)}
+    >
+      <Text style={styles.projectTitle}>{item.title}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.wrapper}>
       <TouchableWithoutFeedback onPress={handleClap}>
@@ -102,53 +292,165 @@ export default function DigitalSlate({ navigation }) {
       <View style={styles.topTriplet}>
         <View style={styles.tripletBox}>
           <Text style={styles.verticalText}>ROLL</Text>
-          <SlateInput placeholder="123" big style={{ width: '100%' }} />
+          <SlateInput 
+            placeholder="123" 
+            big 
+            style={{ width: '100%' }} 
+            value={slateData.roll}
+            onChangeText={(value) => handleInputChange('roll', value)}
+          />
         </View>
         <View style={styles.tripletBox}>
           <Text style={styles.verticalText}>SCENE</Text>
-          <SlateInput placeholder="45A" big style={{ width: '100%' }} />
+          <SlateInput 
+            placeholder="45A" 
+            big 
+            style={{ width: '100%' }} 
+            value={slateData.scene}
+            onChangeText={(value) => handleInputChange('scene', value)}
+          />
         </View>
         <View style={styles.tripletBox}>
           <Text style={styles.verticalText}>TAKE</Text>
-          <SlateInput placeholder="7" big style={{ width: '100%' }} />
+          <SlateInput 
+            placeholder="7" 
+            big 
+            style={{ width: '100%' }} 
+            value={slateData.take}
+            onChangeText={(value) => handleInputChange('take', value)}
+          />
         </View>
       </View>
 
       <View style={styles.slateContainer}>
         <View style={styles.row}>
-          <SlateInput placeholder="PROD" style={{ flex: 1 }} />
+          <SlateInput 
+            placeholder="PROD" 
+            style={{ flex: 1 }} 
+            value={slateData.prod}
+            onChangeText={(value) => handleInputChange('prod', value)}
+          />
         </View>
         <View style={styles.row}>
-          <SlateInput placeholder="DIR" style={{ flex: 1 }} />
+          <SlateInput 
+            placeholder="DIR" 
+            style={{ flex: 1 }} 
+            value={slateData.dir}
+            onChangeText={(value) => handleInputChange('dir', value)}
+          />
         </View>
         <View style={styles.row}>
-          <SlateInput placeholder="CAM" style={{ flex: 1 }} />
-          <SlateInput placeholder="FPS" style={styles.smallField} />
+          <SlateInput 
+            placeholder="CAM" 
+            style={{ flex: 1 }} 
+            value={slateData.cam}
+            onChangeText={(value) => handleInputChange('cam', value)}
+          />
+          <SlateInput 
+            placeholder="FPS" 
+            style={styles.smallField} 
+            value={slateData.fps}
+            onChangeText={(value) => handleInputChange('fps', value)}
+          />
         </View>
         <View style={styles.row}>
-          <SlateInput placeholder="DATE" style={{ flex: 1 }} />
+          <SlateInput 
+            placeholder="DATE" 
+            style={{ flex: 1 }} 
+            value={slateData.date}
+            onChangeText={(value) => handleInputChange('date', value)}
+          />
         </View>
 
-        <View style={styles.toggleRow}>
-          {['INT_EXT', 'DAY_NITE', 'SYNC_MOS'].map((toggleCategory) => (
-            <TouchableOpacity
-              key={toggleCategory}
-              onPress={() => toggleSelection(toggleCategory)}
-              style={styles.toggleButton}
-            >
-              <Text style={styles.toggleButtonText}>
-                {selectedToggles[toggleCategory]}
-              </Text>
+        <View style={styles.toggleContainer}>
+          <View style={styles.toggleRow}>
+            {['INT_EXT', 'DAY_NITE', 'SYNC_MOS'].map((toggleCategory) => (
+              <TouchableOpacity
+                key={toggleCategory}
+                onPress={() => toggleSelection(toggleCategory)}
+                style={styles.toggleButton}
+              >
+                <Text style={styles.toggleButtonText}>
+                  {selectedToggles[toggleCategory]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Home')}>
+              <Ionicons name="home" size={24} color="#000" />
             </TouchableOpacity>
-          ))}
+            <TouchableOpacity 
+              style={[styles.button, styles.saveButton]} 
+              onPress={handleSavePress}
+              disabled={isLoading}
+            >
+              <Ionicons name="save" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="home" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
+      <Modal
+        visible={isProjectModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsProjectModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { transform: [{ rotate: '90deg' }] }]}>
+            <Text style={styles.modalTitle}>Select Project to Save to</Text>
+            <View style={styles.modalBody}>
+              <View style={styles.dropdownContainer}>
+                <FlatList
+                  data={projects}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.projectItem,
+                        selectedProject?._id === item._id && styles.selectedProject
+                      ]}
+                      onPress={() => setSelectedProject(item)}
+                    >
+                      <Text style={[
+                        styles.projectTitle,
+                        selectedProject?._id === item._id && styles.selectedProjectText
+                      ]}>
+                        {item.title}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={item => item._id}
+                  style={styles.projectList}
+                />
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveModalButton]}
+                  onPress={() => {
+                    if (selectedProject) {
+                      handleProjectSelect(selectedProject);
+                    } else {
+                      Alert.alert('Error', 'Please select a project');
+                    }
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelModalButton]}
+                  onPress={() => {
+                    setIsProjectModalVisible(false);
+                    setSelectedProject(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -249,11 +551,31 @@ const styles = StyleSheet.create({
     width: 60,
     marginLeft: 8,
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingRight: 20,
+  },
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 12,
-    right: 130,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  button: {
+    backgroundColor: '#fff',
+    borderColor: '#000',
+    borderWidth: 2,
+    padding: 10,
+    borderRadius: 5,
+    marginHorizontal: 5,
+  },
+  saveButton: {
+    marginLeft: 10,
   },
   toggleButton: {
     backgroundColor: '#fff',
@@ -269,29 +591,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 10,
-    paddingHorizontal: 10,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  button: {
+  modalContent: {
     backgroundColor: '#fff',
-    borderColor: '#000',
-    borderWidth: 2,
-    padding: 10,
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  modalBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  dropdownContainer: {
+    flex: 1,
+    marginRight: 20,
+  },
+  projectList: {
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 5,
-    left: 500,
   },
-  buttonText: {
-    color: '#000',
-    fontSize: 14,
+  projectItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  icon: {
-    width: 20,
-    height: 20,
+  selectedProject: {
+    backgroundColor: '#F8A8B8',
+  },
+  projectTitle: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedProjectText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  modalButtons: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  modalButton: {
+    padding: 12,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  saveModalButton: {
+    backgroundColor: '#F8A8B8',
+  },
+  cancelModalButton: {
+    backgroundColor: '#ff4444',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

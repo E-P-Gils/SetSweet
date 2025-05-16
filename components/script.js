@@ -1,5 +1,5 @@
 // Script.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,162 +7,267 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
+  Dimensions,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import axios from 'axios';
 import { WebView } from 'react-native-webview';
 import { API_BASE_URL } from '../config';
+
+// Helper function for safe JSON parsing
+const safeJsonParse = (data, context) => {
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`JSON parse error in ${context}:`, error);
+    console.error('Raw data:', data);
+    throw new Error(`Invalid JSON in ${context}: ${error.message}`);
+  }
+};
+
+// Helper function for logging
+const logError = (context, error, additionalInfo = {}) => {
+  console.error(`Error in ${context}:`, error);
+  console.error('Additional info:', additionalInfo);
+  if (error.response) {
+    console.error('Response status:', error.response.status);
+    console.error('Response headers:', error.response.headers);
+  }
+};
 
 export default function Script({ navigation, route }) {
   const { project } = route.params;
   const [scriptUrl, setScriptUrl] = useState(null);
+  const [localPdfUri, setLocalPdfUri] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState(null);
 
-  console.log('Script component mounted with params:', route.params);
+  // Memoize the token to avoid unnecessary re-renders
+  const token = project.userData?.token;
 
-  useEffect(() => {
-    console.log('Script component useEffect triggered');
-    fetchScriptUrl();
+  const getFullUrl = useCallback((path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${path}`;
   }, []);
 
-  const fetchScriptUrl = async () => {
+  const downloadAndLoadPdf = useCallback(async (url) => {
     try {
-      console.log('Fetching script URL for project:', project._id);
-      const token = project.userData?.token;
+      console.log('Starting PDF download from:', url);
+      
+      // Create a unique filename for this download
+      const timestamp = new Date().getTime();
+      const localUri = `${FileSystem.cacheDirectory}script_${timestamp}.pdf`;
+      console.log('Local URI for download:', localUri);
+      
+      const downloadResumable = FileSystem.createDownloadResumable(
+        url,
+        localUri,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      console.log('Starting download...');
+      const { uri } = await downloadResumable.downloadAsync();
+      console.log('Download completed to:', uri);
+
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      console.log('File info:', fileInfo);
+      
+      if (!fileInfo.exists) {
+        throw new Error('Downloaded file not found');
+      }
+
+      // Read the file as base64
+      console.log('Reading file as base64...');
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64
+      });
+      console.log('Base64 length:', base64.length);
+
+      // Create a data URI for the PDF
+      const dataUri = `data:application/pdf;base64,${base64}`;
+      setLocalPdfUri(dataUri);
+      return dataUri;
+    } catch (e) {
+      logError('downloadAndLoadPdf', e, { url });
+      setError('Failed to download script');
+      throw e;
+    }
+  }, [token]);
+
+  const fetchScriptUrl = useCallback(async () => {
+    try {
       if (!token) {
-        console.log('No token found, redirecting to login');
         Alert.alert('Error', 'Please log in again');
         navigation.navigate('LoginForm');
         return;
       }
 
-      const response = await axios.get(
+      console.log('Fetching script URL for project:', project._id);
+      const response = await fetch(
         `${API_BASE_URL}/projects/${project._id}/script`,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
         }
       );
 
-      console.log('Script URL response:', response.data);
-      if (response.data.scriptUrl) {
-        // Construct full URL for the script
-        const fullUrl = `${API_BASE_URL.replace('/api', '')}${response.data.scriptUrl}`;
+      console.log('Script URL response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to fetch script: ${response.status} - ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+      
+      const data = safeJsonParse(responseText, 'fetchScriptUrl');
+      console.log('Parsed response:', data);
+      
+      if (data.scriptUrl) {
+        const fullUrl = getFullUrl(data.scriptUrl);
         console.log('Full script URL:', fullUrl);
         setScriptUrl(fullUrl);
+        await downloadAndLoadPdf(fullUrl);
       }
     } catch (error) {
-      console.error('Error fetching script:', error);
-      if (error.response?.status === 401) {
+      logError('fetchScriptUrl', error, { projectId: project._id });
+      setError('Failed to fetch script URL');
+      if (error.message.includes('401')) {
         Alert.alert('Session Expired', 'Please log in again');
         navigation.navigate('LoginForm');
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, project._id, getFullUrl, downloadAndLoadPdf, navigation]);
 
-  const handleUpload = async () => {
-    try {
-      console.log('Starting document picker...');
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true
-      });
+  useEffect(() => {
+    fetchScriptUrl();
+  }, [fetchScriptUrl]);
 
-      console.log('DocumentPicker result:', result);
-      
-      if (result.type === 'success') {
-        console.log('Document selected:', result);
-        await uploadScript(result.uri);
-      } else if (result.type === 'cancel') {
-        console.log('Document picker cancelled');
-      }
-    } catch (error) {
-      console.error('Error picking document:', error);
-      Alert.alert('Error', 'Failed to pick document');
-    }
-  };
-
-  const uploadScript = async (uri) => {
+  const uploadScript = useCallback(async (file) => {
     try {
       setIsUploading(true);
-      console.log('Starting upload process with URI:', uri);
-      
-      const token = project.userData?.token;
+      setError(null);
+
       if (!token) {
-        console.error('No token found');
         Alert.alert('Error', 'Please log in again');
         navigation.navigate('LoginForm');
         return;
       }
 
+      console.log('Starting file upload:', file);
+      
+      // Create FormData
       const formData = new FormData();
       formData.append('script', {
-        uri,
+        uri: Platform.OS === 'ios' ? file.uri.replace('file://', '') : file.uri,
         type: 'application/pdf',
-        name: 'script.pdf'
+        name: file.name
       });
 
-      console.log('FormData contents:', formData._parts);
-      console.log('Project ID:', project._id);
-      console.log('API Base URL:', API_BASE_URL);
-      
-      const response = await axios.post(
+      console.log('Making upload request...');
+      const response = await fetch(
         `${API_BASE_URL}/projects/${project._id}/script`,
-        formData,
         {
+          method: 'POST',
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`
-          }
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          body: formData
         }
       );
 
-      console.log('Upload response:', response.data);
+      console.log('Upload response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(errorText || `Upload failed with status ${response.status}`);
+      }
 
-      if (response.data.scriptUrl) {
-        const fullUrl = `${API_BASE_URL.replace('/api', '')}${response.data.scriptUrl}?t=${Date.now()}`;
-        console.log('Final full URL used for WebView:', fullUrl);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+      
+      const responseData = safeJsonParse(responseText, 'uploadScript');
+      console.log('Parsed response:', responseData);
 
-        // Verify the URL is accessible
-        try {
-          const verifyResponse = await axios.get(fullUrl, {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: 'blob'
-          });
-          console.log('URL verification successful:', verifyResponse.status === 200);
-          setScriptUrl(fullUrl);
-          Alert.alert('Success', 'Script uploaded successfully');
-        } catch (verifyError) {
-          console.error('URL verification failed:', verifyError);
-          Alert.alert('Error', 'Uploaded file is not accessible');
-        }
+      if (responseData.scriptUrl) {
+        const fullUrl = getFullUrl(responseData.scriptUrl);
+        console.log('Full script URL:', fullUrl);
+        setScriptUrl(fullUrl);
+        await downloadAndLoadPdf(fullUrl);
+        Alert.alert('Success', 'Script uploaded successfully');
       } else {
-        console.error('No scriptUrl in response:', response.data);
-        Alert.alert('Error', 'Failed to get script URL from server');
+        throw new Error('No script URL in response');
       }
     } catch (error) {
-      console.error('Error uploading script:', error);
-      if (error.response) {
-        console.error('Error response:', error.response.data);
+      logError('uploadScript', error, { fileName: file.name });
+      let errorMessage = error.message;
+      if (error.message.includes('413')) {
+        errorMessage = 'File is too large. Maximum size is 10MB.';
+      } else if (error.message.includes('415')) {
+        errorMessage = 'Only PDF files are allowed.';
       }
-      if (error.response?.status === 401) {
-        Alert.alert('Session Expired', 'Please log in again');
-        navigation.navigate('LoginForm');
-      } else {
-        Alert.alert('Error', 'Failed to upload script');
-      }
+      
+      setError(`Upload failed: ${errorMessage}`);
+      Alert.alert('Upload Error', `Failed to upload script: ${errorMessage}`);
+      throw error;
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [token, project._id, getFullUrl, downloadAndLoadPdf, navigation]);
 
-  const handleDelete = async () => {
+  const handleUpload = useCallback(async () => {
     try {
-      const token = project.userData?.token;
+      console.log('Starting document picker...');
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf'],
+        copyToCacheDirectory: true,
+        multiple: false
+      });
+      
+      console.log('DocumentPicker result:', result);
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedFile = result.assets[0];
+        console.log('Document selected:', selectedFile);
+        
+        if (!selectedFile.uri || !selectedFile.name) {
+          throw new Error('Invalid file selected');
+        }
+        
+        const fileInfo = await FileSystem.getInfoAsync(selectedFile.uri);
+        console.log('File info:', fileInfo);
+        
+        if (fileInfo.size > 10 * 1024 * 1024) {
+          throw new Error('File is too large. Maximum size is 10MB.');
+        }
+        
+        await uploadScript(selectedFile);
+      }
+    } catch (error) {
+      logError('handleUpload', error);
+      Alert.alert('Error', error.message || 'Failed to pick document');
+    }
+  }, [uploadScript]);
+
+  const handleDelete = useCallback(async () => {
+    try {
       if (!token) {
         Alert.alert('Error', 'Please log in again');
         navigation.navigate('LoginForm');
@@ -182,30 +287,43 @@ export default function Script({ navigation, route }) {
             style: 'destructive',
             onPress: async () => {
               try {
-                const response = await axios.delete(
+                console.log('Deleting script for project:', project._id);
+                const response = await fetch(
                   `${API_BASE_URL}/projects/${project._id}/script`,
                   {
-                    headers: { Authorization: `Bearer ${token}` }
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Accept': 'application/json'
+                    }
                   }
                 );
+
+                console.log('Delete response status:', response.status);
                 
-                if (response.status === 200) {
-                  setScriptUrl(null);
-                  Alert.alert('Success', 'Script deleted successfully');
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  console.error('Error response:', errorText);
+                  throw new Error(errorText || 'Failed to delete script');
                 }
+
+                setScriptUrl(null);
+                setLocalPdfUri(null);
+                setError(null);
+                Alert.alert('Success', 'Script deleted successfully');
               } catch (error) {
-                console.error('Error deleting script:', error);
-                Alert.alert('Error', 'Failed to delete script');
+                logError('handleDelete', error, { projectId: project._id });
+                Alert.alert('Error', `Failed to delete script: ${error.message}`);
               }
             }
           }
         ]
       );
     } catch (error) {
-      console.error('Error in delete handler:', error);
+      logError('handleDelete', error);
       Alert.alert('Error', 'Failed to delete script');
     }
-  };
+  }, [token, project._id, navigation]);
 
   if (isLoading) {
     return (
@@ -222,54 +340,69 @@ export default function Script({ navigation, route }) {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Icon name="arrow-left" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>Script</Text>
       </View>
 
-      {/* Debug Info */}
-      <View style={styles.debugContainer}>
-        <Text style={styles.debugText}>
-          Script URL: {scriptUrl ? 'Set' : 'Not Set'}
-        </Text>
-        <Text style={styles.debugText}>
-          Upload Status: {isUploading ? 'Uploading...' : 'Ready'}
-        </Text>
-      </View>
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
-      {scriptUrl ? (
+      {!scriptUrl ? (
+        <View style={styles.placeholderContainer}>
+          <Text style={styles.placeholderText}>No script uploaded.</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.uploadButton]}
+            onPress={handleUpload}
+            disabled={isUploading}
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color="#fff" style={styles.buttonIcon} />
+            <Text style={styles.buttonText}>
+              {isUploading ? 'Uploading...' : 'Upload Script'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
         <View style={styles.pdfContainer}>
-          <WebView
-            key={scriptUrl}
-            source={{ uri: scriptUrl }}
-            style={styles.pdfViewer}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('WebView error:', nativeEvent);
-              Alert.alert('Error', `Failed to load PDF: ${nativeEvent.description}`);
-            }}
-            onLoad={() => console.log('PDF loaded successfully')}
-            onLoadStart={() => console.log('PDF loading started')}
-            onHttpError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('WebView HTTP error:', nativeEvent);
-            }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            scalesPageToFit={true}
-            renderLoading={() => (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#F8A8B8" />
-              </View>
-            )}
-          />
+          {localPdfUri ? (
+            <WebView
+              source={{ uri: localPdfUri }}
+              style={styles.pdfViewer}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error('WebView error:', nativeEvent);
+                setError(`Failed to load PDF: ${nativeEvent.description}`);
+              }}
+              onLoad={() => {
+                console.log('PDF loaded successfully');
+                setError(null);
+              }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              scalesPageToFit={true}
+              originWhitelist={['*']}
+              renderLoading={() => (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#F8A8B8" />
+                </View>
+              )}
+            />
+          ) : (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#F8A8B8" />
+              <Text style={styles.loadingText}>Loading PDF...</Text>
+            </View>
+          )}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, styles.deleteButton]}
               onPress={handleDelete}
             >
-              <Icon name="trash" size={20} color="#fff" style={styles.buttonIcon} />
+              <Ionicons name="trash-outline" size={20} color="#fff" style={styles.buttonIcon} />
               <Text style={styles.buttonText}>Delete Script</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -277,25 +410,12 @@ export default function Script({ navigation, route }) {
               onPress={handleUpload}
               disabled={isUploading}
             >
-              <Icon name="refresh" size={20} color="#fff" style={styles.buttonIcon} />
+              <Ionicons name="refresh" size={20} color="#fff" style={styles.buttonIcon} />
               <Text style={styles.buttonText}>
                 {isUploading ? 'Uploading...' : 'Replace Script'}
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-      ) : (
-        <View style={styles.uploadContainer}>
-          <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={handleUpload}
-            disabled={isUploading}
-          >
-            <Icon name="upload" size={24} color="#fff" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>
-              {isUploading ? 'Uploading...' : 'Upload Script'}
-            </Text>
-          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -327,27 +447,23 @@ const styles = StyleSheet.create({
     margin: 20,
     borderRadius: 10,
     overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
   },
   pdfViewer: {
     flex: 1,
-    height: '100%',
+    width: Dimensions.get('window').width - 40,
     backgroundColor: '#fff',
   },
-  uploadContainer: {
+  placeholderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8A8B8',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 20,
+  placeholderText: {
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -364,6 +480,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 150,
     justifyContent: 'center',
+  },
+  uploadButton: {
+    backgroundColor: '#F8A8B8',
   },
   deleteButton: {
     backgroundColor: '#ff4444',
@@ -386,15 +505,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-  debugContainer: {
+  loadingText: {
+    color: '#F8A8B8',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
     padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.1)',
     margin: 10,
     borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
   },
-  debugText: {
-    color: '#fff',
-    fontSize: 12,
-    marginBottom: 5,
+  errorText: {
+    color: '#c62828',
+    textAlign: 'center',
   },
 }); 

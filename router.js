@@ -12,7 +12,7 @@ const fs = require('fs');
 const app = express();
 
 const PORT = 3001;
-const LOCAL_IP ="REPLACEWITHIP";
+const LOCAL_IP ="LOCALIPADDRESS"; 
 // const app = express();
 
 // Middleware to handle JSON and URL-encoded data
@@ -82,6 +82,7 @@ const verifyToken = (req, res, next) => {
     req.userId = decoded.userId;
     next();
   } catch (error) {
+    console.error('Token verification failed:', error);
     return res.status(401).json({ message: 'Invalid token' });
   }
 };
@@ -515,6 +516,98 @@ router.delete('/projects/:projectId/script', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error deleting script:', error);
     res.status(500).json({ message: 'Error deleting script' });
+  }
+});
+
+// Add slate to project
+router.post('/projects/:projectId/slates', verifyToken, async (req, res) => {
+  try {
+    console.log('Received slate data:', req.body);
+    console.log('Project ID:', req.params.projectId);
+    console.log('User ID:', req.userId);
+
+    const project = await Project.findById(req.params.projectId);
+    if (!project) {
+      console.log('Project not found');
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user owns the project
+    if (project.user.toString() !== req.userId) {
+      console.log('Unauthorized access attempt');
+      return res.status(403).json({ message: 'Not authorized to add slates to this project' });
+    }
+
+    const slate = {
+      roll: req.body.roll,
+      scene: req.body.scene,
+      take: req.body.take,
+      prod: req.body.prod,
+      dir: req.body.dir,
+      cam: req.body.cam,
+      fps: req.body.fps,
+      date: req.body.date,
+      toggles: req.body.toggles,
+      createdAt: new Date()
+    };
+
+    console.log('Adding slate to project:', slate);
+    project.slates.push(slate);
+    await project.save();
+    console.log('Slate saved successfully');
+
+    res.status(201).json(slate);
+  } catch (error) {
+    console.error('Error adding slate:', error);
+    res.status(500).json({ message: 'Error adding slate to project', error: error.message });
+  }
+});
+
+// Get all slates for a project
+router.get('/projects/:projectId/slates', verifyToken, async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user owns the project
+    if (project.user.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to view slates for this project' });
+    }
+
+    res.json(project.slates);
+  } catch (error) {
+    console.error('Error fetching slates:', error);
+    res.status(500).json({ message: 'Error fetching project slates' });
+  }
+});
+
+// Delete a slate from a project
+router.delete('/projects/:projectId/slates/:slateId', verifyToken, async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user owns the project
+    if (project.user.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to delete slates from this project' });
+    }
+
+    const slateIndex = project.slates.findIndex(slate => slate._id.toString() === req.params.slateId);
+    if (slateIndex === -1) {
+      return res.status(404).json({ message: 'Slate not found' });
+    }
+
+    project.slates.splice(slateIndex, 1);
+    await project.save();
+
+    res.json({ message: 'Slate deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting slate:', error);
+    res.status(500).json({ message: 'Error deleting slate' });
   }
 });
 

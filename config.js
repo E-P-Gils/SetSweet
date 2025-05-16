@@ -1,4 +1,4 @@
-const LOCAL_IP = "REPLACEWITHIP";
+const LOCAL_IP = "LOCALIPADDRESS"; 
 
 const API_BASE_URL = __DEV__ 
   ? `http://${LOCAL_IP}:3001/api`

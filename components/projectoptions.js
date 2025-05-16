@@ -56,7 +56,7 @@ export default function ProjectOptions({ navigation, route }) {
       <OptionBtn
         icon="photo"
         label="Slates"
-        onPress={() => navigation.navigate('SlatesScreen', { project })}
+        onPress={() => navigation.navigate('SavedSlates', { project })}
       />
 
       <OptionBtn
