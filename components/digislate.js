@@ -28,13 +28,15 @@ const SlateInput = ({ placeholder, big, style, value, onChangeText, ...props }) 
 export default function DigitalSlate({ navigation, route }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
   const soundRef = useRef(null);
+  
+  // State for toggle selections
   const [selectedToggles, setSelectedToggles] = useState({
     INT_EXT: 'INT',
     DAY_NITE: 'DAY',
     SYNC_MOS: 'SYNC',
   });
 
-  // Add state for all input fields
+  // State for slate data fields
   const [slateData, setSlateData] = useState({
     roll: '',
     scene: '',
@@ -43,38 +45,32 @@ export default function DigitalSlate({ navigation, route }) {
     dir: '',
     cam: '',
     fps: '',
-    date: '',
+    date: new Date().toISOString().split('T')[0], // Format: YYYY-MM-DD
   });
 
-  // Add state for project selection modal
+  // Check if we're in view mode and load slate data if provided
+  useEffect(() => {
+    if (route.params?.isViewMode && route.params?.slateData) {
+      setSlateData(route.params.slateData);
+      setSelectedToggles(route.params.slateData.toggles);
+    }
+  }, [route.params]);
+
+  // State for project selection
   const [isProjectModalVisible, setIsProjectModalVisible] = useState(false);
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
 
-  // Add debounce timer ref
-  const saveTimerRef = useRef(null);
+  // State for success modal
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
-  // Load saved data when component mounts
+  // Load saved data when component mounts (only if not in view mode)
   useEffect(() => {
-    loadSavedData();
-  }, []);
-
-  // Save data whenever it changes
-  useEffect(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
+    if (!route.params?.isViewMode) {
+      loadSavedData();
     }
-    saveTimerRef.current = setTimeout(() => {
-      saveData();
-    }, 1000); // Debounce for 1 second
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, [slateData, selectedToggles]);
+  }, []);
 
   const loadSavedData = async () => {
     try {
@@ -90,18 +86,6 @@ export default function DigitalSlate({ navigation, route }) {
       }
     } catch (error) {
       console.error('Error loading saved slate data:', error);
-    }
-  };
-
-  const saveData = async () => {
-    try {
-      const dataToSave = {
-        slateData,
-        selectedToggles,
-      };
-      await AsyncStorage.setItem('slateData', JSON.stringify(dataToSave));
-    } catch (error) {
-      console.error('Error saving slate data:', error);
     }
   };
 
@@ -201,7 +185,7 @@ export default function DigitalSlate({ navigation, route }) {
         dir: slateData.dir,
         cam: slateData.cam,
         fps: slateData.fps,
-        date: new Date().toISOString(),
+        date: slateData.date,
         toggles: {
           INT_EXT: selectedToggles.INT_EXT,
           DAY_NITE: selectedToggles.DAY_NITE,
@@ -211,7 +195,6 @@ export default function DigitalSlate({ navigation, route }) {
 
       console.log('Saving slate data:', slateToSave);
       console.log('To project:', project._id);
-      console.log('Using token:', parsedUserData.token);
 
       const response = await fetch(
         `${API_BASE_URL}/projects/${project._id}/slates`,
@@ -237,9 +220,36 @@ export default function DigitalSlate({ navigation, route }) {
       const savedSlate = JSON.parse(responseText);
       console.log('Saved slate:', savedSlate);
 
-      Alert.alert('Success', 'Slate saved successfully');
-      setSelectedProject(null);
-      setIsProjectModalVisible(false);
+      // Create a custom success modal instead of using Alert
+      const successModal = (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => {
+            setSelectedProject(null);
+            setIsProjectModalVisible(false);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.successModal, { transform: [{ rotate: '90deg' }] }]}>
+              <Text style={styles.successText}>Slate saved successfully!</Text>
+              <TouchableOpacity
+                style={styles.successButton}
+                onPress={() => {
+                  setSelectedProject(null);
+                  setIsProjectModalVisible(false);
+                }}
+              >
+                <Text style={styles.successButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      );
+
+      // Show the success modal
+      setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error saving slate:', error);
       Alert.alert('Error', error.message || 'Failed to save slate');
@@ -298,6 +308,7 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ width: '100%' }} 
             value={slateData.roll}
             onChangeText={(value) => handleInputChange('roll', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
         <View style={styles.tripletBox}>
@@ -308,6 +319,7 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ width: '100%' }} 
             value={slateData.scene}
             onChangeText={(value) => handleInputChange('scene', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
         <View style={styles.tripletBox}>
@@ -318,6 +330,7 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ width: '100%' }} 
             value={slateData.take}
             onChangeText={(value) => handleInputChange('take', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
       </View>
@@ -329,6 +342,7 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ flex: 1 }} 
             value={slateData.prod}
             onChangeText={(value) => handleInputChange('prod', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
         <View style={styles.row}>
@@ -337,6 +351,7 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ flex: 1 }} 
             value={slateData.dir}
             onChangeText={(value) => handleInputChange('dir', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
         <View style={styles.row}>
@@ -345,12 +360,14 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ flex: 1 }} 
             value={slateData.cam}
             onChangeText={(value) => handleInputChange('cam', value)}
+            editable={!route.params?.isViewMode}
           />
           <SlateInput 
             placeholder="FPS" 
             style={styles.smallField} 
             value={slateData.fps}
             onChangeText={(value) => handleInputChange('fps', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
         <View style={styles.row}>
@@ -359,6 +376,7 @@ export default function DigitalSlate({ navigation, route }) {
             style={{ flex: 1 }} 
             value={slateData.date}
             onChangeText={(value) => handleInputChange('date', value)}
+            editable={!route.params?.isViewMode}
           />
         </View>
 
@@ -367,8 +385,11 @@ export default function DigitalSlate({ navigation, route }) {
             {['INT_EXT', 'DAY_NITE', 'SYNC_MOS'].map((toggleCategory) => (
               <TouchableOpacity
                 key={toggleCategory}
-                onPress={() => toggleSelection(toggleCategory)}
-                style={styles.toggleButton}
+                onPress={() => !route.params?.isViewMode && toggleSelection(toggleCategory)}
+                style={[
+                  styles.toggleButton,
+                  route.params?.isViewMode && styles.toggleButtonDisabled
+                ]}
               >
                 <Text style={styles.toggleButtonText}>
                   {selectedToggles[toggleCategory]}
@@ -380,13 +401,15 @@ export default function DigitalSlate({ navigation, route }) {
             <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Home')}>
               <Ionicons name="home" size={24} color="#000" />
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.button, styles.saveButton]} 
-              onPress={handleSavePress}
-              disabled={isLoading}
-            >
-              <Ionicons name="save" size={24} color="#000" />
-            </TouchableOpacity>
+            {!route.params?.isViewMode && (
+              <TouchableOpacity 
+                style={[styles.button, styles.saveButton]} 
+                onPress={handleSavePress}
+                disabled={isLoading}
+              >
+                <Ionicons name="save" size={24} color="#000" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -451,6 +474,35 @@ export default function DigitalSlate({ navigation, route }) {
           </View>
         </View>
       </Modal>
+
+      {successModalVisible && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => {
+            setSuccessModalVisible(false);
+            setSelectedProject(null);
+            setIsProjectModalVisible(false);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.successModal, { transform: [{ rotate: '90deg' }] }]}>
+              <Text style={styles.successText}>Slate saved successfully!</Text>
+              <TouchableOpacity
+                style={styles.successButton}
+                onPress={() => {
+                  setSuccessModalVisible(false);
+                  setSelectedProject(null);
+                  setIsProjectModalVisible(false);
+                }}
+              >
+                <Text style={styles.successButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -658,11 +710,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8A8B8',
   },
   cancelModalButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: '#F8A8B8',
   },
   modalButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  successModal: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 300,
+    height: 200,
+  },
+  successText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  successButton: {
+    backgroundColor: '#F8A8B8',
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 5,
+  },
+  successButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  toggleButtonDisabled: {
+    opacity: 0.7,
   },
 });

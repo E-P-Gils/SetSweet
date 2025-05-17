@@ -348,6 +348,7 @@ const Floorplan = ({ navigation, route }) => {
 
   const handleEditName = () => {
     if (selectedShapeId) {
+      console.log('Opening name modal for shape:', selectedShapeId);
       const selectedShape = shapes.find(shape => shape.id === selectedShapeId);
       setCurrentName(selectedShape?.name || '');
       setIsNameModalVisible(true);
@@ -355,6 +356,7 @@ const Floorplan = ({ navigation, route }) => {
   };
 
   const handleSaveName = () => {
+    console.log('Saving name:', currentName);
     if (selectedShapeId) {
       setShapes(prev =>
         prev.map(shape =>
@@ -617,29 +619,40 @@ const Floorplan = ({ navigation, route }) => {
         visible={isNameModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setIsNameModalVisible(false)}
+        onRequestClose={() => {
+          console.log('Modal closed');
+          setIsNameModalVisible(false);
+        }}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { transform: [{ rotate: '0deg' }] }]}>
+            <Text style={styles.modalTitle}>Enter Name</Text>
             <TextInput
               style={styles.nameInput}
               value={currentName}
               onChangeText={setCurrentName}
               placeholder="Enter name"
               placeholderTextColor="#999"
+              maxLength={20}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setIsNameModalVisible(false)}
+                style={[styles.modalButton, styles.modalCancelButton]} 
+                onPress={() => {
+                  console.log('Cancel pressed');
+                  setIsNameModalVisible(false);
+                }}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.saveButton]} 
-                onPress={handleSaveName}
+                style={[styles.modalButton, styles.modalSaveButton]} 
+                onPress={() => {
+                  console.log('Save pressed');
+                  handleSaveName();
+                }}
               >
-                <Text style={styles.buttonText}>Save</Text>
+                <Text style={styles.modalButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -789,38 +802,65 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: 250,
+    zIndex: 1000,
   },
   modalContent: {
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
-    width: '90%',
-    maxWidth: 500,
+    width: 300,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
   },
   nameInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
     padding: 10,
-    marginBottom: 20,
+    width: '100%',
     fontSize: 16,
-    maxLength: 10,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    width: '100%',
     gap: 10,
   },
   modalButton: {
-    padding: 10,
+    flex: 1,
+    padding: 12,
     borderRadius: 5,
-    minWidth: 80,
     alignItems: 'center',
+    minWidth: 100,
   },
-  cancelButton: {
-    backgroundColor: '#ddd',
+  modalCancelButton: {
+    backgroundColor: '#F8A8B8',
+  },
+  modalSaveButton: {
+    backgroundColor: '#F8A8B8',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
   savingOverlay: {
     position: 'absolute',

@@ -16,25 +16,32 @@ export default function SavedSlates({ navigation, route }) {
   const fetchSlates = async () => {
     try {
       setIsLoading(true);
-      const token = await AsyncStorage.getItem('userData');
-      if (!token) {
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
         Alert.alert('Error', 'Please log in to view slates');
         navigation.navigate('LoginForm');
         return;
       }
 
-      const parsedToken = JSON.parse(token);
-      const response = await fetch(`${API_BASE_URL}/projects/${project._id}/slates`, {
-        headers: {
-          'Authorization': `Bearer ${parsedToken.token}`
+      const parsedUserData = JSON.parse(userData);
+      console.log('Fetching slates for project:', project._id);
+
+      const response = await fetch(
+        `${API_BASE_URL}/projects/${project._id}/slates`,
+        {
+          headers: {
+            'Authorization': `Bearer ${parsedUserData.token}`,
+            'Accept': 'application/json'
+          }
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch slates');
       }
 
       const slatesData = await response.json();
+      console.log('Fetched slates:', slatesData);
       setSlates(slatesData);
     } catch (error) {
       console.error('Error fetching slates:', error);
@@ -45,38 +52,77 @@ export default function SavedSlates({ navigation, route }) {
   };
 
   const handleDeleteSlate = async (slateId) => {
-    try {
-      const token = await AsyncStorage.getItem('userData');
-      if (!token) {
-        Alert.alert('Error', 'Please log in to delete slates');
-        return;
-      }
+    Alert.alert(
+      'Delete Slate',
+      'Are you sure you want to delete this slate? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const userData = await AsyncStorage.getItem('userData');
+              if (!userData) {
+                Alert.alert('Error', 'Please log in to delete slates');
+                navigation.navigate('LoginForm');
+                return;
+              }
 
-      const parsedToken = JSON.parse(token);
-      const response = await fetch(`${API_BASE_URL}/projects/${project._id}/slates/${slateId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${parsedToken.token}`
+              const parsedUserData = JSON.parse(userData);
+              const response = await fetch(
+                `${API_BASE_URL}/projects/${project._id}/slates/${slateId}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${parsedUserData.token}`,
+                    'Accept': 'application/json'
+                  }
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error('Failed to delete slate');
+              }
+
+              // Remove the deleted slate from the state
+              setSlates(prevSlates => prevSlates.filter(slate => slate._id !== slateId));
+              Alert.alert('Success', 'Slate deleted successfully');
+            } catch (error) {
+              console.error('Error deleting slate:', error);
+              Alert.alert('Error', 'Failed to delete slate');
+            }
+          }
         }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete slate');
-      }
-
-      setSlates(slates.filter(slate => slate._id !== slateId));
-      Alert.alert('Success', 'Slate deleted successfully');
-    } catch (error) {
-      console.error('Error deleting slate:', error);
-      Alert.alert('Error', 'Failed to delete slate');
-    }
+      ],
+      { cancelable: true }
+    );
   };
 
   const renderSlateItem = ({ item }) => (
-    <View style={styles.slateItem}>
+    <TouchableOpacity 
+      style={styles.slateItem}
+      onPress={() => navigation.navigate('DigitalSlate', { 
+        slateData: {
+          roll: item.roll,
+          scene: item.scene,
+          take: item.take,
+          prod: item.prod,
+          dir: item.dir,
+          cam: item.cam,
+          fps: item.fps,
+          date: item.date,
+          toggles: item.toggles
+        },
+        isViewMode: true
+      })}
+    >
       <View style={styles.slateHeader}>
         <Text style={styles.slateTitle}>
-          {item.roll} - Scene {item.scene} - Take {item.take}
+          Roll: {item.roll} | Scene: {item.scene} | Take: {item.take}
         </Text>
         <TouchableOpacity
           onPress={() => handleDeleteSlate(item._id)}
@@ -85,18 +131,21 @@ export default function SavedSlates({ navigation, route }) {
           <Ionicons name="trash-outline" size={24} color="#ff4444" />
         </TouchableOpacity>
       </View>
+      
       <View style={styles.slateDetails}>
-        <Text style={styles.slateText}>
-          {item.toggles.INT_EXT} / {item.toggles.DAY_NITE} / {item.toggles.SYNC_MOS}
-        </Text>
-        <Text style={styles.slateText}>
-          Prod: {item.prod} | Dir: {item.dir} | Cam: {item.cam}
-        </Text>
-        <Text style={styles.slateText}>
-          FPS: {item.fps} | Date: {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
+        <Text style={styles.detailText}>Production: {item.prod}</Text>
+        <Text style={styles.detailText}>Director: {item.dir}</Text>
+        <Text style={styles.detailText}>Camera: {item.cam}</Text>
+        <Text style={styles.detailText}>FPS: {item.fps}</Text>
+        <Text style={styles.detailText}>Date: {new Date(item.date).toLocaleDateString()}</Text>
       </View>
-    </View>
+
+      <View style={styles.toggleContainer}>
+        <Text style={styles.toggleText}>INT/EXT: {item.toggles.INT_EXT}</Text>
+        <Text style={styles.toggleText}>DAY/NIGHT: {item.toggles.DAY_NITE}</Text>
+        <Text style={styles.toggleText}>SYNC/MOS: {item.toggles.SYNC_MOS}</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -123,7 +172,7 @@ export default function SavedSlates({ navigation, route }) {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No saved slates found</Text>
+              <Text style={styles.emptyText}>No slates saved yet</Text>
             </View>
           }
         />
@@ -164,11 +213,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   slateHeader: {
     flexDirection: 'row',
@@ -185,14 +234,24 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   slateDetails: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 10,
+    marginBottom: 10,
   },
-  slateText: {
+  detailText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    padding: 10,
+    borderRadius: 5,
+  },
+  toggleText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
@@ -201,7 +260,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#fff',
     textAlign: 'center',
   },

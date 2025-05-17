@@ -8,7 +8,7 @@ export default function SceneOptions({ navigation, route }) {
 
   const handleFloorplanNavigation = () => {
     // Ensure we pass the complete scene data including floorplan
-    navigation.navigate('FloorPlanScreen', { 
+    navigation.navigate('Floorplan', { 
       scene: {
         ...scene,
         floorplan: scene.floorplan || { shapes: [], paths: [] },

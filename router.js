@@ -12,7 +12,7 @@ const fs = require('fs');
 const app = express();
 
 const PORT = 3001;
-const LOCAL_IP ="LOCALIPADDRESS"; 
+const LOCAL_IP ="REPLACEWITHIP";
 // const app = express();
 
 // Middleware to handle JSON and URL-encoded data
