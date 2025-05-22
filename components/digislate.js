@@ -280,7 +280,7 @@ export default function DigitalSlate({ navigation, route }) {
                 transform: [{
                   translateY: clapAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [-20, 19.5]
+                    outputRange: [-30, 29.5]
                   })
                 }]
               }
@@ -510,7 +510,7 @@ export default function DigitalSlate({ navigation, route }) {
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 20,
     transform: [{ rotate: '90deg' }],
   },
   clapperContainer: {
@@ -518,12 +518,13 @@ const styles = StyleSheet.create({
     width: 850,
     height: 40,
     marginBottom: 5,
-    left: 185,
+    left: 205,
+    top: -20,
   },
   clapperArm: {
     flexDirection: 'row',
     width: 850,
-    height: 20,
+    height: 30,
     justifyContent: 'space-between',
     borderTopLeftRadius: 5,
     borderTopRightRadius: 5,
@@ -532,11 +533,11 @@ const styles = StyleSheet.create({
   },
   topClapper: {
     position: 'absolute',
-    top: -20,
+    top: -30,
   },
   bottomClapper: {
     position: 'absolute',
-    top: 20,
+    top: 30,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     borderBottomLeftRadius: 5,
@@ -553,7 +554,7 @@ const styles = StyleSheet.create({
     padding: 10,
     width: 750,
     alignSelf: 'center',
-    left: 185,
+    left: 205,
   },
   row: {
     flexDirection: 'row',
@@ -569,7 +570,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
     position: 'relative',
-    left: 185, 
+    left: 205, 
     width: 750, 
   },
   tripletBox: {

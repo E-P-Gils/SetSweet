@@ -16,60 +16,31 @@ export default function ProjectOptions({ navigation, route }) {
     });
   };
 
-  const handleScriptNavigation = () => {
-    console.log('Starting Script navigation...');
-    console.log('Current navigation state:', navigation.getState());
-    console.log('Navigating to Script with:', { project, userData });
-    try {
-      navigation.push('Script', { 
-        project: {
-          ...project,
-          userData: userData || project.userData
-        }
-      });
-      console.log('Navigation command executed');
-    } catch (error) {
-      console.error('Navigation error:', error);
-      try {
-        navigation.navigate('Script', { 
-          project: {
-            ...project,
-            userData: userData || project.userData
-          }
-        });
-      } catch (fallbackError) {
-        console.error('Fallback navigation error:', fallbackError);
-      }
-    }
-  };
-
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>{project.title}</Text>
+      <View style={styles.contentContainer}>
+        <Text style={styles.header}>{project.title}</Text>
 
-      <OptionBtn
-        icon="list-ul"
-        label="Scenes"
-        onPress={handleSceneNavigation}
-      />
+        <View style={styles.buttonContainer}>
+          <OptionBtn
+            icon="list-ul"
+            label="Scenes"
+            onPress={handleSceneNavigation}
+          />
 
-      <OptionBtn
-        icon="photo"
-        label="Slates"
-        onPress={() => navigation.navigate('SavedSlates', { project })}
-      />
+          <OptionBtn
+            icon="photo"
+            label="Slates"
+            onPress={() => navigation.navigate('SavedSlates', { project })}
+          />
 
-      <OptionBtn
-        icon="file-text-o"
-        label="Script"
-        onPress={handleScriptNavigation}
-      />
-
-      <OptionBtn
-        icon="arrow-left"
-        label="Back to Projects"
-        onPress={() => navigation.navigate('ProjectScreen')}
-      />
+          <OptionBtn
+            icon="arrow-left"
+            label="Back to Projects"
+            onPress={() => navigation.navigate('ProjectScreen')}
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -86,20 +57,29 @@ const OptionBtn = ({ icon, label, onPress }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 20,
     backgroundColor: '#00B5B8',
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginTop: -60,
   },
   header: {
     fontSize: 26,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 40,
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    width: '80%',
+    alignItems: 'center',
   },
   optionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#F8A8B8',
     padding: 15,
     borderRadius: 10,
@@ -112,5 +92,6 @@ const styles = StyleSheet.create({
   optionText: {
     color: '#fff',
     fontSize: 18,
+    textAlign: 'center',
   },
 });

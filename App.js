@@ -14,8 +14,8 @@ import Scenes from './components/scenes';
 import SceneOptions from './components/sceneoptions';
 import Notes from './components/notes';
 import Floorplan from './components/floorplan';
-import Script from './components/script';
 import SavedSlates from './components/savedslates';
+import GreenScreen from './components/greenscreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -143,13 +143,13 @@ export default function App() {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
-          name="Script" 
-          component={Script}
+          name="SavedSlates" 
+          component={SavedSlates}
           options={{ headerShown: false }}
         />
         <Stack.Screen 
-          name="SavedSlates" 
-          component={SavedSlates}
+          name="GreenScreen" 
+          component={GreenScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

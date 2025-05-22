@@ -42,6 +42,11 @@ export default function HomePage({ navigation, isLoggedIn, onLogout }) {
         <Text style={styles.buttonText}>DigiSlate</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('GreenScreen')}>
+        <Icon name="magic" size={20} color="white" style={styles.icon} />
+        <Text style={styles.buttonText}>GreenScreen</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('ProjectScreen')}>
         <Icon name="theater-masks" size={20} color="white" style={styles.icon} />
         <Text style={styles.buttonText}>Projects</Text>
