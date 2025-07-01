@@ -14,6 +14,7 @@ export default function CameraZoom({ navigation }) {
   const [showGrid, setShowGrid] = useState(false); 
   const [aspectRatio, setAspectRatio] = useState('16:9');  
   const [showBorder, setShowBorder] = useState(false); 
+  const [viewfinderRatio, setViewfinderRatio] = useState('3:4'); // New state for viewfinder aspect ratio
 
   const { width, height } = Dimensions.get('window');
   
@@ -22,6 +23,15 @@ export default function CameraZoom({ navigation }) {
   const aspectRatioHeight = height * (3 / 4); // For 4:3 aspect ratio
   
   const cameraHeight = aspectRatio === '16:9' ? height : aspectRatioHeight;
+
+  // Calculate viewfinder overlay dimensions for film camera look
+  const viewfinderAspectRatio = viewfinderRatio === '3:4' ? 3 / 4 : 9 / 16; // 3:4 horizontal, 16:9 vertical
+  const viewfinderWidth = width * 0.85; // 85% of screen width
+  const viewfinderHeight = viewfinderWidth / viewfinderAspectRatio;
+  
+  // Calculate overlay dimensions to center the viewfinder
+  const overlayTop = (height - viewfinderHeight) / 2;
+  const overlayLeft = (width - viewfinderWidth) / 2;
 
   if (!permission) return <View />;
   if (!permission.granted) {
@@ -92,6 +102,10 @@ export default function CameraZoom({ navigation }) {
     }
   };
 
+  const toggleViewfinderRatio = () => {
+    setViewfinderRatio(viewfinderRatio === '3:4' ? '16:9' : '3:4');
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <PinchGestureHandler onGestureEvent={(event) => {
@@ -105,44 +119,48 @@ export default function CameraZoom({ navigation }) {
         <View style={styles.cameraContainer}>
           <CameraView 
             style={[styles.camera, { width, height: cameraHeight }]} 
-            zoom={zoom} 
+            zoom={zoom}
+            focusable={false}
+            enableAutoFocus={false}
+            enableAutoZoom={false}
+            autoFocus={false}
+            focusDistance={1.0}
+            enablePinchToZoom={false}
           >
-            <TouchableOpacity style={[styles.focalLengthButton, { left: width * 0.796 }, { top: width * 0.12 }]}  onPress={() => setShowDropdown(!showDropdown)}>
-              <Text style={styles.focalLengthButtonText}>{selectedFocalLength}mm</Text>
-            </TouchableOpacity>
-
-            {showDropdown && (
-              <View style={[styles.dropdown, { left: width * 0.2, top: width * -0.315 }]} >
-                <ScrollView contentContainerStyle={styles.dropdownContent}>
-                  {Array.from({ length: 183 }, (_, i) => i + 18).map((value) => (
-                    <TouchableOpacity 
-                      key={value} 
-                      style={styles.dropdownItem} 
-                      onPress={() => handleFocalLengthSelect(value)}
-                    >
-                      <Text style={styles.dropdownItemText}>{value}mm</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            <TouchableOpacity style={[styles.gridButton, { left: width * 0.86 }, { top: width * 0.33 }]} onPress={() => setShowGrid(!showGrid)}>
-              <Text style={styles.gridButtonText}>3x3</Text>
-            </TouchableOpacity>
-
-            {/* 3x3 Grid Overlay */}
-            {showGrid && (
-              <View style={[styles.gridOverlay, { pointerEvents: 'none' }]} >
-                {/* Horizontal Lines */}
-                <View style={[styles.horizontalLine, { top: '33%' }]} />
-                <View style={[styles.horizontalLine, { top: '66%' }]} />
-
-                {/* Vertical Lines */}
-                <View style={[styles.verticalLine, { left: '33%' }]} />
-                <View style={[styles.verticalLine, { left: '66%' }]} />
-              </View>
-            )}
+            {/* Film Camera Viewfinder Overlay */}
+            <View style={styles.viewfinderOverlay}>
+              {/* Top overlay */}
+              <View style={[styles.overlayBar, { 
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: overlayTop 
+              }]} />
+              
+              {/* Left overlay */}
+              <View style={[styles.overlayBar, { 
+                top: overlayTop, 
+                left: 0, 
+                width: overlayLeft, 
+                height: viewfinderHeight 
+              }]} />
+              
+              {/* Right overlay */}
+              <View style={[styles.overlayBar, { 
+                top: overlayTop, 
+                left: overlayLeft + viewfinderWidth, 
+                width: overlayLeft, 
+                height: viewfinderHeight 
+              }]} />
+              
+              {/* Bottom overlay */}
+              <View style={[styles.overlayBar, { 
+                top: overlayTop + viewfinderHeight, 
+                left: 0, 
+                width: '100%', 
+                height: height + 100 
+              }]} />
+            </View>
 
             {/* Border with Aspect Ratio Text when activated */}
             {showBorder && (
@@ -152,15 +170,60 @@ export default function CameraZoom({ navigation }) {
         </View>
       </PinchGestureHandler>
 
-      {/* Home Icon Button */}
-      <TouchableOpacity style={[styles.homeButton, { left: width * 0.87 }, { top: width * 0.615 }]} onPress={() => navigation.navigate('Home')}>
-        <Icon name="home" size={30} color="white" />
+      {/* Control Buttons - Positioned outside CameraView for visibility */}
+      <TouchableOpacity style={[styles.focalLengthButton, { left: width * 0.75, top: 67 }]}  onPress={() => setShowDropdown(!showDropdown)}>
+        <Text style={styles.focalLengthButtonText}>{selectedFocalLength}mm</Text>
       </TouchableOpacity>
 
-      {/* Aspect Ratio Switch Buttons */}
-      <TouchableOpacity style={[styles.aspectRatioButtons, { left: width * 0.86 }, { top: width * 0.47}]} onPress={toggleAspectRatio}>
-        <Icon name="arrows-h" size={30} color="white" style={styles.icon} />
+      {/* Viewfinder Toggle Button */}
+      <TouchableOpacity style={[styles.viewfinderButton, { left: width * 0.835 }, { top: height * 0.83 }]} onPress={toggleViewfinderRatio}>
+        <Text style={styles.viewfinderButtonText}>{viewfinderRatio}</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity style={[styles.gridButton, { left: width * 0.85 }, { top: height * 0.92 }]} onPress={() => setShowGrid(!showGrid)}>
+        <Text style={styles.gridButtonText}>3x3</Text>
+      </TouchableOpacity>
+
+      {showDropdown && (
+        <View style={[styles.dropdown, { left: width * 0.18, top: -110 }]} >
+          <ScrollView contentContainerStyle={styles.dropdownContent}>
+            {Array.from({ length: 183 }, (_, i) => i + 18).map((value) => (
+              <TouchableOpacity 
+                key={value} 
+                style={styles.dropdownItem} 
+                onPress={() => handleFocalLengthSelect(value)}
+              >
+                <Text style={styles.dropdownItemText}>{value}mm</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* 3x3 Grid Overlay */}
+      {showGrid && (
+        <View style={[styles.gridOverlay, { 
+          pointerEvents: 'none',
+          top: overlayTop,
+          left: overlayLeft,
+          width: viewfinderWidth,
+          height: viewfinderHeight,
+        }]} >
+          {/* Horizontal Lines */}
+          <View style={[styles.horizontalLine, { top: '33%' }]} />
+          <View style={[styles.horizontalLine, { top: '66%' }]} />
+
+          {/* Vertical Lines */}
+          <View style={[styles.verticalLine, { left: '33%' }]} />
+          <View style={[styles.verticalLine, { left: '66%' }]} />
+        </View>
+      )}
+
+      {/* Home Icon Button */}
+      <TouchableOpacity style={[styles.homeButton, { left: width * 0.1 }, { top: height * 0.9 }]} onPress={() => navigation.navigate('Home')}>
+        <Icon name="home" size={30} color="black" />
+      </TouchableOpacity>
+
     </GestureHandlerRootView>
   );
 }
@@ -184,7 +247,7 @@ const styles = StyleSheet.create({
   focalLengthButton: {
     position: 'absolute',
     top: 40,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'white',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 5,
@@ -192,20 +255,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center', 
     width: 100,
-    height: 40, 
+    height: 40,
+    zIndex: 10,
   },
   focalLengthButtonText: {
     fontSize: 16,
-    color: 'white',
+    color: 'black',
     textAlign: 'center', 
     lineHeight: 20, 
   },
   dropdown: {
     position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'white',
     borderRadius: 5,
     padding: 10,
-    zIndex: 1,
+    zIndex: 11,
     transform: [{ rotate: '90deg' }],
     height: 400,
     width: 110, 
@@ -221,27 +285,24 @@ const styles = StyleSheet.create({
   },
   dropdownItemText: {
     fontSize: 16,
-    color: 'white',
+    color: 'black',
     textAlign: 'center', 
   },
   gridButton: {
     position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'white',
     padding: 10,
     borderRadius: 5,
     transform: [{ rotate: '90deg' }],
+    zIndex: 10,
   },
   gridButtonText: {
     fontSize: 16,
-    color: 'white',
+    color: 'black',
   },
   gridOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    zIndex: 2,
+    zIndex: 3,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -259,7 +320,7 @@ const styles = StyleSheet.create({
   },
   homeButton: {
     position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'white',
     padding: 5,
     borderRadius: 50,
     justifyContent: 'center',
@@ -268,7 +329,7 @@ const styles = StyleSheet.create({
   },
   aspectRatioButtons: {
     position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'white',
     padding: 10,
     borderRadius: 50,
     justifyContent: 'center',
@@ -337,5 +398,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  viewfinderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 1,
+  },
+  overlayBar: {
+    position: 'absolute',
+    backgroundColor: 'black',
+  },
+  viewfinderButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    padding: 10,
+    borderRadius: 5,
+    transform: [{ rotate: '90deg' }],
+    zIndex: 10,
+    width: 60,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewfinderButtonText: {
+    fontSize: 16,
+    color: 'black',
   },
 });
