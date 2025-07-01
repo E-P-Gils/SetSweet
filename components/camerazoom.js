@@ -17,9 +17,6 @@ export default function CameraZoom({ navigation }) {
 
   const { width, height } = Dimensions.get('window');
   
-  // Dynamically calculate the zoom based on the screen width
-  const screenWidthRatio = width / 375; // 375 is a baseline for smaller devices (like iPhone SE)
-
   // Calculate aspect ratio based height
   const aspectRatioWidth = width;
   const aspectRatioHeight = height * (3 / 4); // For 4:3 aspect ratio
@@ -56,14 +53,27 @@ export default function CameraZoom({ navigation }) {
   }
 
   const calculateZoom = (focalLength) => {
-    // Adjust zoom based on screen size for consistency across devices
-    const baseZoom = (focalLength - 18) / (200 - 18); 
-    return baseZoom * screenWidthRatio;  // Scale the zoom for different devices
+    // Use logarithmic scale for proper zoom calculation
+    // 18mm = 1x zoom (wide angle), 200mm = ~11x zoom (telephoto)
+    const minFocalLength = 18;
+    const maxFocalLength = 200;
+    
+    // Calculate zoom factor using logarithmic scale
+    const zoomFactor = Math.log(focalLength / minFocalLength) / Math.log(maxFocalLength / minFocalLength);
+    
+    // Clamp zoom between 0 and 1
+    return Math.max(0, Math.min(1, zoomFactor));
   };
 
   const calculateFocalLength = (zoom) => {
-    const focalLength = Math.round(18 + zoom * (200 - 18));
-    return focalLength;
+    // Reverse the logarithmic calculation
+    const minFocalLength = 18;
+    const maxFocalLength = 200;
+    
+    // Calculate focal length from zoom factor
+    const focalLength = minFocalLength * Math.pow(maxFocalLength / minFocalLength, zoom);
+    
+    return Math.round(focalLength);
   };
 
   const handleFocalLengthSelect = (value) => {
@@ -85,7 +95,8 @@ export default function CameraZoom({ navigation }) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <PinchGestureHandler onGestureEvent={(event) => {
-        let newZoom = zoom + (event.nativeEvent.scale - 1) * 0.015; 
+        // Use a more responsive scaling factor for pinch gestures
+        let newZoom = zoom + (event.nativeEvent.scale - 1) * 0.1; 
         newZoom = Math.max(0, Math.min(newZoom, 1)); 
         setZoom(newZoom);
         setScale(event.nativeEvent.scale); 
