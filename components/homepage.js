@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 
-export default function HomePage({ navigation, isLoggedIn, onLogout }) {
+export default function HomePage({ navigation, isLoggedIn, onLogout, userData }) {
   const handleAuth = () => {
     if (isLoggedIn) {
       Alert.alert(
@@ -51,6 +51,16 @@ export default function HomePage({ navigation, isLoggedIn, onLogout }) {
         <Icon name="theater-masks" size={20} color="white" style={styles.icon} />
         <Text style={styles.buttonText}>Projects</Text>
       </TouchableOpacity>
+
+      {isLoggedIn && (
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={() => navigation.navigate('Invitations', { userData })}
+        >
+          <Icon name="envelope" size={20} color="white" style={styles.icon} />
+          <Text style={styles.buttonText}>Invitations</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.button} onPress={handleAuth}>
         <Icon name={isLoggedIn ? "sign-out-alt" : "user"} size={20} color="white" style={styles.icon} />

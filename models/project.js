@@ -32,6 +32,25 @@ const projectSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  sharedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  pendingInvitations: [{
+    email: {
+      type: String,
+      required: true
+    },
+    invitedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    invitedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   scriptUrl: {
     type: String,
     default: null

@@ -26,7 +26,7 @@ export default function SceneOptions({ navigation, route }) {
         icon="picture-o"
         label="StoryBoard"
         onPress={() =>
-          navigation.navigate('StoryBoardScreen', { scene, project })
+          navigation.navigate('Storyboard', { scene, project })
         }
       />
 
@@ -45,7 +45,7 @@ export default function SceneOptions({ navigation, route }) {
       <OptionBtn
         icon="arrow-left"
         label="Back to Scenes"
-        onPress={() => navigation.goBack()}
+        onPress={() => navigation.navigate('Scenes', { project })}
       />
     </View>
   );

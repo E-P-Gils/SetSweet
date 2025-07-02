@@ -16,6 +16,8 @@ import Notes from './components/notes';
 import Floorplan from './components/floorplan';
 import SavedSlates from './components/savedslates';
 import GreenScreen from './components/greenscreen';
+import Storyboard from './components/storyboard';
+import Invitations from './components/invitations';
 
 const Stack = createNativeStackNavigator();
 
@@ -73,6 +75,7 @@ export default function App() {
             <HomePage 
               {...props} 
               isLoggedIn={isLoggedIn} 
+              userData={userData}
               onLogout={handleLogout}
             />
           )}
@@ -150,6 +153,16 @@ export default function App() {
         <Stack.Screen 
           name="GreenScreen" 
           component={GreenScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Storyboard" 
+          component={Storyboard}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Invitations" 
+          component={Invitations}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

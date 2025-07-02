@@ -1,9 +1,11 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useState } from 'react';
-import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image, Modal, Dimensions } from 'react-native'; 
+import { useState, useRef } from 'react';
+import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image, Modal, Dimensions, Alert } from 'react-native'; 
 import { PinchGestureHandler } from 'react-native-gesture-handler'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
 import Icon from 'react-native-vector-icons/FontAwesome'; 
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 
 export default function CameraZoom({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -15,6 +17,19 @@ export default function CameraZoom({ navigation }) {
   const [aspectRatio, setAspectRatio] = useState('16:9');  
   const [showBorder, setShowBorder] = useState(false); 
   const [viewfinderRatio, setViewfinderRatio] = useState('3:4'); // New state for viewfinder aspect ratio
+  const [isTakingPicture, setIsTakingPicture] = useState(false);
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [showStoryboardMenu, setShowStoryboardMenu] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [scenes, setScenes] = useState([]);
+  const [frames, setFrames] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedScene, setSelectedScene] = useState(null);
+  const [selectedFrame, setSelectedFrame] = useState(null);
+  const [currentMenuLayer, setCurrentMenuLayer] = useState('project'); // 'project', 'scene', 'frame'
+
+  const cameraRef = useRef(null);
 
   const { width, height } = Dimensions.get('window');
   
@@ -106,6 +121,268 @@ export default function CameraZoom({ navigation }) {
     setViewfinderRatio(viewfinderRatio === '3:4' ? '16:9' : '3:4');
   };
 
+  const takePicture = async () => {
+    console.log('Camera button pressed!');
+    if (isTakingPicture) return;
+
+    try {
+      setIsTakingPicture(true);
+      console.log('Starting camera capture...');
+      
+      if (!cameraRef.current) {
+        throw new Error('Camera ref not available');
+      }
+      
+      // Take a photo using the camera
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        format: 'jpeg',
+      });
+      
+      console.log('Photo captured successfully:', photo);
+      console.log('Photo URI:', photo.uri);
+      
+      // Store the captured photo and show save menu
+      setCapturedPhoto({ uri: photo.uri });
+      setShowSaveMenu(true);
+    } catch (error) {
+      console.error('Error taking photo - Full error object:', error);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error stack:', error.stack);
+      Alert.alert('Error', `Failed to take photo: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsTakingPicture(false);
+    }
+  };
+
+  const saveToCameraRoll = async () => {
+    if (!capturedPhoto) return;
+
+    try {
+      console.log('Starting save to camera roll process...');
+      console.log('Captured photo URI:', capturedPhoto.uri);
+      console.log('Selected focal length:', selectedFocalLength);
+      
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      console.log('Media library permission status:', status);
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to save photos to your camera roll');
+        return;
+      }
+
+      // Save the photo to camera roll
+      await MediaLibrary.saveToLibraryAsync(capturedPhoto.uri);
+      
+      console.log('Photo saved to camera roll successfully');
+      setShowSaveMenu(false);
+      setCapturedPhoto(null);
+    } catch (error) {
+      console.error('Error saving photo to camera roll - Full error object:', error);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error stack:', error.stack);
+      Alert.alert('Error', `Failed to save photo to camera roll: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const closeSaveMenu = () => {
+    setShowSaveMenu(false);
+    setCapturedPhoto(null);
+  };
+
+  const fetchProjects = async () => {
+    try {
+      console.log('Fetching projects...');
+      const response = await fetch('http://192.168.1.3:3001/api/projects');
+      
+      if (!response.ok) {
+        console.error('Failed to fetch projects:', response.status, response.statusText);
+        setProjects([]);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Projects fetched successfully:', data);
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setProjects([]);
+      Alert.alert('Error', 'Failed to fetch projects. Please try again.');
+    }
+  };
+
+  const fetchScenes = async (projectId) => {
+    try {
+      console.log('Fetching scenes for project:', projectId);
+      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${projectId}`);
+      
+      console.log('Scenes response status:', response.status);
+      console.log('Scenes response headers:', response.headers);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch scenes:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        setScenes([]);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Scenes fetched successfully:', data);
+      setScenes(data || []);
+    } catch (error) {
+      console.error('Error fetching scenes:', error);
+      console.error('Error details:', error.message);
+      setScenes([]);
+      Alert.alert('Error', 'Failed to fetch scenes. Please try again.');
+    }
+  };
+
+  const fetchFrames = async (sceneId) => {
+    try {
+      console.log('Fetching frames for scene:', sceneId);
+      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${sceneId}/storyboard`);
+      
+      console.log('Frames response status:', response.status);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch frames:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        setFrames([]);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Frames fetched successfully:', data);
+      setFrames(data.frames || data || []);
+    } catch (error) {
+      console.error('Error fetching frames:', error);
+      console.error('Error details:', error.message);
+      setFrames([]);
+      Alert.alert('Error', 'Failed to fetch frames. Please try again.');
+    }
+  };
+
+  const openStoryboardMenu = async () => {
+    console.log('Opening storyboard menu...');
+    
+    // Check if user is logged in by trying to fetch projects
+    try {
+      const response = await fetch('http://192.168.1.3:3001/api/projects');
+      if (!response.ok) {
+        Alert.alert(
+          'Login Required', 
+          'You must be logged in to save photos to storyboard. Please log in through the main app first.',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+      
+      const projects = await response.json();
+      if (!Array.isArray(projects) || projects.length === 0) {
+        Alert.alert(
+          'No Projects Available', 
+          'You must create a project first to save photos to storyboard. Please log in and create a project through the main app.',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+    } catch (error) {
+      Alert.alert(
+        'Connection Error', 
+        'Unable to connect to the server. Please check your connection and try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
+    setShowSaveMenu(false);
+    setShowStoryboardMenu(true);
+    setSelectedProject(null);
+    setSelectedScene(null);
+    setSelectedFrame(null);
+    setScenes([]);
+    setFrames([]);
+    setCurrentMenuLayer('project');
+    console.log('Current menu layer set to:', 'project');
+    await fetchProjects();
+  };
+
+  const closeStoryboardMenu = () => {
+    setShowStoryboardMenu(false);
+    setCapturedPhoto(null);
+  };
+
+  const goToSceneSelection = (project) => {
+    console.log('Going to scene selection for project:', project.title);
+    setSelectedProject(project);
+    setCurrentMenuLayer('scene');
+    console.log('Current menu layer set to:', 'scene');
+    fetchScenes(project._id);
+  };
+
+  const goToFrameSelection = (scene) => {
+    console.log('Going to frame selection for scene:', scene.title);
+    setSelectedScene(scene);
+    setCurrentMenuLayer('frame');
+    console.log('Current menu layer set to:', 'frame');
+    fetchFrames(scene._id);
+  };
+
+  const goBackToProjectSelection = () => {
+    setCurrentMenuLayer('project');
+    setSelectedProject(null);
+    setSelectedScene(null);
+    setSelectedFrame(null);
+    setScenes([]);
+    setFrames([]);
+  };
+
+  const goBackToSceneSelection = () => {
+    setCurrentMenuLayer('scene');
+    setSelectedScene(null);
+    setSelectedFrame(null);
+    setFrames([]);
+  };
+
+  const saveToStoryboard = async () => {
+    if (!selectedFrame || !capturedPhoto) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('image', {
+        uri: capturedPhoto.uri,
+        type: 'image/jpeg',
+        name: 'photo.jpg',
+      });
+      formData.append('focalLength', selectedFocalLength.toString());
+
+      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${selectedScene._id}/storyboard/frames/${selectedFrame}/image`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Photo saved to storyboard frame successfully:', result);
+        closeStoryboardMenu();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save to storyboard');
+      }
+    } catch (error) {
+      console.error('Error saving to storyboard:', error);
+      Alert.alert('Error', `Failed to save photo to storyboard: ${error.message}`);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <PinchGestureHandler onGestureEvent={(event) => {
@@ -118,6 +395,7 @@ export default function CameraZoom({ navigation }) {
       }} >
         <View style={styles.cameraContainer}>
           <CameraView 
+            ref={cameraRef}
             style={[styles.camera, { width, height: cameraHeight }]} 
             zoom={zoom}
             focusable={false}
@@ -166,6 +444,8 @@ export default function CameraZoom({ navigation }) {
             {showBorder && (
               <View style={[styles.aspectRatioBorder]} />
             )}
+
+            {/* Focal Length Overlay - Removed, will be added to saved photo instead */}
           </CameraView>
         </View>
       </PinchGestureHandler>
@@ -173,6 +453,15 @@ export default function CameraZoom({ navigation }) {
       {/* Control Buttons - Positioned outside CameraView for visibility */}
       <TouchableOpacity style={[styles.focalLengthButton, { left: width * 0.75, top: 67 }]}  onPress={() => setShowDropdown(!showDropdown)}>
         <Text style={styles.focalLengthButtonText}>{selectedFocalLength}mm</Text>
+      </TouchableOpacity>
+
+      {/* Take Picture Button */}
+      <TouchableOpacity 
+        style={[styles.takePictureButton, { left: width * 0.45 }, { top: height * 0.9 }]} 
+        onPress={takePicture}
+        disabled={isTakingPicture}
+      >
+        <Icon name="camera" size={24} color="black" />
       </TouchableOpacity>
 
       {/* Viewfinder Toggle Button */}
@@ -220,10 +509,188 @@ export default function CameraZoom({ navigation }) {
       )}
 
       {/* Home Icon Button */}
-      <TouchableOpacity style={[styles.homeButton, { left: width * 0.1 }, { top: height * 0.9 }]} onPress={() => navigation.navigate('Home')}>
+      <TouchableOpacity style={[styles.homeButton, { left: width * 0.1 }, { top: height * 0.91 }]} onPress={() => navigation.navigate('Home')}>
         <Icon name="home" size={30} color="black" />
       </TouchableOpacity>
 
+      {/* Save Menu Modal */}
+      <Modal
+        visible={showSaveMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeSaveMenu}
+      >
+        <View style={styles.saveMenuOverlay}>
+          <View style={styles.saveMenuContainer}>
+            <Text style={styles.saveMenuTitle}>Save Photo</Text>
+            
+            <View style={styles.saveMenuOptionsRow}>
+              <TouchableOpacity 
+                style={styles.saveMenuOption}
+                onPress={saveToCameraRoll}
+              >
+                <Icon name="photo" size={24} color="#007AFF" />
+                <Text style={styles.saveMenuOptionText}>Camera Roll</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.saveMenuOption}
+                onPress={openStoryboardMenu}
+              >
+                <Icon name="image" size={24} color="#34C759" />
+                <Text style={styles.saveMenuOptionText}>Story Board</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.saveMenuOption}
+                onPress={closeSaveMenu}
+              >
+                <Icon name="times" size={24} color="#FF3B30" />
+                <Text style={styles.saveMenuOptionText}>Don't Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Storyboard Selection Modal */}
+      <Modal
+        visible={showStoryboardMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeStoryboardMenu}
+      >
+        <View style={styles.saveMenuOverlay}>
+          <View style={styles.storyboardMenuContainer}>
+            <Text style={styles.saveMenuTitle}>Save to Storyboard</Text>
+            
+            {/* Debug Info */}
+            <Text style={styles.debugText}>
+              Layer: {currentMenuLayer} | Projects: {projects.length} | Scenes: {scenes.length} | Frames: {frames.length}
+            </Text>
+            
+            {/* Project Selection Layer */}
+            {currentMenuLayer === 'project' && (
+              <View style={styles.menuLayer}>
+                <Text style={styles.selectionLabel}>Select Project:</Text>
+                <ScrollView style={styles.selectionList}>
+                  {Array.isArray(projects) && projects.length > 0 ? (
+                    projects.map((project) => (
+                      <TouchableOpacity
+                        key={project._id}
+                        style={styles.selectionItem}
+                        onPress={() => goToSceneSelection(project)}
+                      >
+                        <Text style={styles.selectionItemText}>{project.title}</Text>
+                        <Icon name="chevron-right" size={16} color="#007AFF" />
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noDataText}>No projects available</Text>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Scene Selection Layer */}
+            {currentMenuLayer === 'scene' && (
+              <View style={styles.menuLayer}>
+                <View style={styles.menuHeader}>
+                  <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={goBackToProjectSelection}
+                  >
+                    <Icon name="arrow-left" size={16} color="#007AFF" />
+                    <Text style={styles.backButtonText}>Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.currentSelection}>{selectedProject?.title}</Text>
+                </View>
+                
+                <Text style={styles.selectionLabel}>Select Scene:</Text>
+                <ScrollView style={styles.selectionList}>
+                  {Array.isArray(scenes) && scenes.length > 0 ? (
+                    scenes.map((scene) => (
+                      <TouchableOpacity
+                        key={scene._id}
+                        style={styles.selectionItem}
+                        onPress={() => goToFrameSelection(scene)}
+                      >
+                        <Text style={styles.selectionItemText}>{scene.title}</Text>
+                        <Icon name="chevron-right" size={16} color="#007AFF" />
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noDataText}>No scenes available</Text>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Frame Selection Layer */}
+            {currentMenuLayer === 'frame' && (
+              <View style={styles.menuLayer}>
+                <View style={styles.menuHeader}>
+                  <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={goBackToSceneSelection}
+                  >
+                    <Icon name="arrow-left" size={16} color="#007AFF" />
+                    <Text style={styles.backButtonText}>Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.currentSelection}>{selectedScene?.title}</Text>
+                </View>
+                
+                <Text style={styles.selectionLabel}>Select Frame:</Text>
+                <ScrollView style={styles.selectionList}>
+                  {Array.isArray(frames) && frames.length > 0 ? (
+                    frames.map((frame, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.selectionItem,
+                          selectedFrame === index && styles.selectedItem
+                        ]}
+                        onPress={() => setSelectedFrame(index)}
+                      >
+                        <Text style={styles.selectionItemText}>
+                          Frame {index + 1} {frame.focalLength ? `(${frame.focalLength}mm)` : ''}
+                        </Text>
+                        {selectedFrame === index && (
+                          <Icon name="check" size={16} color="#34C759" />
+                        )}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noDataText}>No frames available</Text>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.storyboardActionButtons}>
+              <TouchableOpacity 
+                style={[styles.storyboardActionButton, styles.cancelButton]}
+                onPress={closeStoryboardMenu}
+              >
+                <Text style={styles.storyboardActionButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.storyboardActionButton, 
+                  styles.saveButton,
+                  (!selectedFrame) && styles.disabledButton
+                ]}
+                onPress={saveToStoryboard}
+                disabled={!selectedFrame}
+              >
+                <Text style={styles.storyboardActionButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -426,5 +893,176 @@ const styles = StyleSheet.create({
   viewfinderButtonText: {
     fontSize: 16,
     color: 'black',
+  },
+  takePictureButton: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 30,
+    transform: [{ rotate: '90deg' }],
+    zIndex: 20,
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveMenuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    width: '90%',
+    maxWidth: 500,
+    alignItems: 'center',
+    transform: [{ rotate: '90deg' }],
+  },
+  saveMenuTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#000',
+    textAlign: 'center',
+  },
+  saveMenuOptionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 20,
+  },
+  saveMenuOption: {
+    padding: 15,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 10,
+    width: '28%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  saveMenuOptionText: {
+    fontSize: 14,
+    color: 'black',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  storyboardMenuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    width: '90%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    alignItems: 'center',
+    transform: [{ rotate: '90deg' }],
+  },
+  menuLayer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  backButtonText: {
+    fontSize: 14,
+    color: '#007AFF',
+    marginLeft: 5,
+  },
+  currentSelection: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'black',
+    flex: 1,
+  },
+  selectionSection: {
+    marginBottom: 15,
+    width: '100%',
+  },
+  selectionLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: 'black',
+  },
+  selectionList: {
+    maxHeight: 150,
+    width: '100%',
+  },
+  selectionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 5,
+    marginBottom: 5,
+    backgroundColor: 'white',
+  },
+  selectedItem: {
+    backgroundColor: '#007AFF',
+  },
+  selectionItemText: {
+    fontSize: 14,
+    color: 'black',
+    flex: 1,
+  },
+  storyboardActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 15,
+  },
+  storyboardActionButton: {
+    padding: 12,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 10,
+    width: '45%',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#FF3B30',
+  },
+  saveButton: {
+    backgroundColor: '#34C759',
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
+  storyboardActionButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  noDataText: {
+    fontSize: 14,
+    color: 'black',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: 20,
+  },
+  debugText: {
+    fontSize: 14,
+    color: 'black',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: 20,
   },
 });

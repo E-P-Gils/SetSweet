@@ -179,14 +179,22 @@ export default function ProjectScreen({ navigation, isLoggedIn, userData }) {
           data={projects}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <View style={[styles.card, item.isShared && styles.sharedCard]}>
               <TouchableOpacity
                 style={styles.cardLeft}
                 onPress={() =>
                   navigation.navigate('ProjectOptions', { project: item, userData })
                 }>
-                <Icon name="film" size={18} color="#fff" style={styles.cardIcon} />
+                <Icon 
+                  name={item.isShared ? "users" : "film"} 
+                  size={18} 
+                  color="#fff" 
+                  style={styles.cardIcon} 
+                />
                 <Text style={styles.cardText}>{item.title}</Text>
+                {item.isShared && (
+                  <Text style={styles.sharedLabel}>Shared</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => deleteProject(item._id)}>
@@ -315,5 +323,14 @@ const styles = StyleSheet.create({
   },
   homeFab: {
     backgroundColor: '#F8A8B8',
+  },
+  sharedCard: {
+    backgroundColor: '#A8F8B8',
+  },
+  sharedLabel: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 });
