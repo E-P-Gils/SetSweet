@@ -508,12 +508,14 @@ export default function StoryboardScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          {scene.title} – Storyboard
-        </Text>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.navigate('SceneOptions', { scene, project })}>
+          <Icon name="arrow-left" size={24} color="#fff" />
+        </TouchableOpacity>
         
-        <View style={styles.headerButtons}>
+        <View style={styles.topBarButtons}>
           <TouchableOpacity 
             style={styles.addFrameButton}
             onPress={createSingleFrame}
@@ -671,12 +673,7 @@ export default function StoryboardScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      {/* Back Button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.navigate('SceneOptions', { scene, project })}>
-        <Icon name="arrow-left" size={24} color="#fff" />
-      </TouchableOpacity>
+
     </View>
   );
 }
@@ -689,23 +686,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#00B5B8',
     alignItems: 'center',
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
     marginBottom: 20,
+    paddingTop: 10,
   },
-  headerButtons: {
+  topBarButtons: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: 'bold',
-    flex: 1,
   },
   addFrameButton: {
     backgroundColor: '#34C759',
@@ -822,9 +814,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   backButton: {
-    position: 'absolute',
-    top: 30,
-    left: 20,
     backgroundColor: '#666',
     padding: 12,
     borderRadius: 8,

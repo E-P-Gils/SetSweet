@@ -1,9 +1,31 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image, Modal, FlatList, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Animated, TouchableWithoutFeedback, TouchableOpacity, Image, Modal, FlatList, Alert, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config';
+
+// Get screen dimensions for responsive design
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Calculate responsive scaling factors
+const getResponsiveScale = () => {
+  // Base dimensions for a standard phone screen (e.g., iPhone 12)
+  const baseWidth = 390;
+  const baseHeight = 844;
+  
+  // Calculate scale factors
+  const widthScale = screenWidth / baseWidth;
+  const heightScale = screenHeight / baseHeight;
+  
+  // Use the smaller scale to ensure everything fits
+  return Math.min(widthScale, heightScale, 1.2); // Cap at 1.2 to prevent oversized elements
+};
+
+const scale = getResponsiveScale();
+
+// Helper function to scale dimensions
+const scaledSize = (size) => size * scale;
 
 const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
 const topClapperColors = ['#f7ec13', '#00a94f', '#0072ce', '#e30613', '#ffffff', '#a0a0a0', '#4a4a4a', '#000'];
@@ -28,6 +50,9 @@ const SlateInput = ({ placeholder, big, style, value, onChangeText, ...props }) 
 export default function DigitalSlate({ navigation, route }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
   const soundRef = useRef(null);
+  
+  // State for responsive scaling
+  const [currentScale, setCurrentScale] = useState(scale);
   
   // State for toggle selections
   const [selectedToggles, setSelectedToggles] = useState({
@@ -64,6 +89,17 @@ export default function DigitalSlate({ navigation, route }) {
 
   // State for success modal
   const [successModalVisible, setSuccessModalVisible] = useState(false);
+
+  // Handle screen dimension changes
+  useEffect(() => {
+    const updateScale = () => {
+      const newScale = getResponsiveScale();
+      setCurrentScale(newScale);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateScale);
+    return () => subscription?.remove();
+  }, []);
 
   // Load saved data when component mounts (only if not in view mode)
   useEffect(() => {
@@ -280,7 +316,7 @@ export default function DigitalSlate({ navigation, route }) {
                 transform: [{
                   translateY: clapAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [-30, 29.5]
+                    outputRange: [-60, 30]
                   })
                 }]
               }
@@ -510,38 +546,39 @@ export default function DigitalSlate({ navigation, route }) {
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: scaledSize(20),
     transform: [{ rotate: '90deg' }],
   },
   clapperContainer: {
     position: 'relative',
-    width: 850,
-    height: 40,
-    marginBottom: 5,
-    left: 205,
-    top: -20,
+    width: scaledSize(950),
+    height: scaledSize(40),
+    marginBottom: scaledSize(5),
+    left: scaledSize(255),
+    top: scaledSize(-20),
   },
   clapperArm: {
     flexDirection: 'row',
-    width: 850,
-    height: 30,
+    width: scaledSize(950),
+    height: scaledSize(30),
     justifyContent: 'space-between',
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
+    borderTopLeftRadius: scaledSize(5),
+    borderTopRightRadius: scaledSize(5),
     overflow: 'hidden',
     elevation: 3,
   },
   topClapper: {
     position: 'absolute',
-    top: -30,
+    top: scaledSize(-60),
+    height: scaledSize(60),
   },
   bottomClapper: {
     position: 'absolute',
-    top: 30,
+    top: scaledSize(30),
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    borderBottomLeftRadius: 5,
-    borderBottomRightRadius: 5,
+    borderBottomLeftRadius: scaledSize(5),
+    borderBottomRightRadius: scaledSize(5),
   },
   colorBar: {
     flex: 1,
@@ -549,67 +586,67 @@ const styles = StyleSheet.create({
   },
   slateContainer: {
     backgroundColor: '#fff',
-    borderWidth: 2,
+    borderWidth: scaledSize(2),
     borderColor: '#000',
-    padding: 10,
-    width: 750,
+    padding: scaledSize(10),
+    width: scaledSize(750),
     alignSelf: 'center',
-    left: 205,
+    left: scaledSize(235),
   },
   row: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: scaledSize(8),
   },
   labeledInput: {
     flexDirection: 'column',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: scaledSize(10),
   },
   topTriplet: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: scaledSize(10),
     position: 'relative',
-    left: 205, 
-    width: 750, 
+    left: scaledSize(235), 
+    width: scaledSize(750), 
   },
   tripletBox: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 5,
+    marginHorizontal: scaledSize(5),
   },
   bigInputField: {
-    width: 150,
-    height: 50,
-    fontSize: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    width: scaledSize(150),
+    height: scaledSize(50),
+    fontSize: scaledSize(20),
+    paddingVertical: scaledSize(8),
+    paddingHorizontal: scaledSize(10),
   },
   verticalText: {
     transform: [{ rotate: '360deg' }],
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: scaledSize(12),
     letterSpacing: 1,
   },
   inputField: {
-    borderWidth: 1,
+    borderWidth: scaledSize(1),
     borderColor: '#000',
-    padding: 6,
-    width: 100,
-    marginTop: 4,
-    fontSize: 12,
+    padding: scaledSize(6),
+    width: scaledSize(100),
+    marginTop: scaledSize(4),
+    fontSize: scaledSize(12),
     textAlign: 'center',
   },
   smallField: {
-    width: 60,
-    marginLeft: 8,
+    width: scaledSize(60),
+    marginLeft: scaledSize(8),
   },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingRight: 20,
+    marginTop: scaledSize(12),
+    paddingRight: scaledSize(20),
   },
   toggleRow: {
     flexDirection: 'row',
@@ -622,26 +659,26 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#fff',
     borderColor: '#000',
-    borderWidth: 2,
-    padding: 10,
-    borderRadius: 5,
-    marginHorizontal: 5,
+    borderWidth: scaledSize(2),
+    padding: scaledSize(10),
+    borderRadius: scaledSize(5),
+    marginHorizontal: scaledSize(5),
   },
   saveButton: {
-    marginLeft: 10,
+    marginLeft: scaledSize(10),
   },
   toggleButton: {
     backgroundColor: '#fff',
     borderColor: '#000',
-    borderWidth: 2,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginHorizontal: 5,
+    borderWidth: scaledSize(2),
+    paddingVertical: scaledSize(10),
+    paddingHorizontal: scaledSize(20),
+    borderRadius: scaledSize(5),
+    marginHorizontal: scaledSize(5),
   },
   toggleButtonText: {
     color: '#000',
-    fontSize: 16,
+    fontSize: scaledSize(16),
     fontWeight: 'bold',
   },
   modalOverlay: {
@@ -652,15 +689,15 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
+    padding: scaledSize(20),
+    borderRadius: scaledSize(10),
     width: '80%',
     maxHeight: '80%',
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: scaledSize(24),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: scaledSize(20),
     textAlign: 'center',
     color: '#333',
   },
