@@ -197,9 +197,11 @@ export default function ProjectScreen({ navigation, isLoggedIn, userData }) {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => deleteProject(item._id)}>
-                <Icon name="trash" size={20} color="#fff" />
-              </TouchableOpacity>
+              {!item.isShared && (
+                <TouchableOpacity onPress={() => deleteProject(item._id)}>
+                  <Icon name="trash" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           )}
         />

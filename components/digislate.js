@@ -158,7 +158,7 @@ export default function DigitalSlate({ navigation, route }) {
       setIsProjectModalVisible(true);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      Alert.alert('Error', 'Failed to load projects');
+      // Don't show alert for fetch errors as they might be temporary
     } finally {
       setIsLoading(false);
     }

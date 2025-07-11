@@ -181,9 +181,11 @@ export default function SceneScreen({ navigation, route }) {
                 <Text style={styles.cardText}>{item.title}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => deleteScene(item._id)}>
-                <Icon name="trash" size={20} color="#fff" />
-              </TouchableOpacity>
+              {!project.isShared && (
+                <TouchableOpacity onPress={() => deleteScene(item._id)}>
+                  <Icon name="trash" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           )}
         />

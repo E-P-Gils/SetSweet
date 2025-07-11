@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/FontAwesome'; 
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CameraZoom({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -196,7 +197,29 @@ export default function CameraZoom({ navigation }) {
   const fetchProjects = async () => {
     try {
       console.log('Fetching projects...');
-      const response = await fetch('http://192.168.1.3:3001/api/projects');
+      
+      // Get user authentication token
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        console.error('No user data found');
+        setProjects([]);
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      const token = parsedUserData.token;
+
+      if (!token) {
+        console.error('No authentication token found');
+        setProjects([]);
+        return;
+      }
+
+      const response = await fetch('http://192.168.1.3:3001/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       if (!response.ok) {
         console.error('Failed to fetch projects:', response.status, response.statusText);
@@ -217,7 +240,29 @@ export default function CameraZoom({ navigation }) {
   const fetchScenes = async (projectId) => {
     try {
       console.log('Fetching scenes for project:', projectId);
-      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${projectId}`);
+      
+      // Get user authentication token
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        console.error('No user data found');
+        setScenes([]);
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      const token = parsedUserData.token;
+
+      if (!token) {
+        console.error('No authentication token found');
+        setScenes([]);
+        return;
+      }
+
+      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       console.log('Scenes response status:', response.status);
       console.log('Scenes response headers:', response.headers);
@@ -244,7 +289,29 @@ export default function CameraZoom({ navigation }) {
   const fetchFrames = async (sceneId) => {
     try {
       console.log('Fetching frames for scene:', sceneId);
-      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${sceneId}/storyboard`);
+      
+      // Get user authentication token
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        console.error('No user data found');
+        setFrames([]);
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      const token = parsedUserData.token;
+
+      if (!token) {
+        console.error('No authentication token found');
+        setFrames([]);
+        return;
+      }
+
+      const response = await fetch(`http://192.168.1.3:3001/api/scenes/${sceneId}/storyboard`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       console.log('Frames response status:', response.status);
       
@@ -270,9 +337,37 @@ export default function CameraZoom({ navigation }) {
   const openStoryboardMenu = async () => {
     console.log('Opening storyboard menu...');
     
-    // Check if user is logged in by trying to fetch projects
+    // Check if user is logged in by getting user data
     try {
-      const response = await fetch('http://192.168.1.3:3001/api/projects');
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        Alert.alert(
+          'Login Required', 
+          'You must be logged in to save photos to storyboard. Please log in through the main app first.',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      const token = parsedUserData.token;
+
+      if (!token) {
+        Alert.alert(
+          'Login Required', 
+          'Authentication token not found. Please log in again.',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+
+      // Check if user has projects by trying to fetch projects
+      const response = await fetch('http://192.168.1.3:3001/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
       if (!response.ok) {
         Alert.alert(
           'Login Required', 
@@ -353,6 +448,21 @@ export default function CameraZoom({ navigation }) {
     if (!selectedFrame || !capturedPhoto) return;
 
     try {
+      // Get user authentication token from AsyncStorage
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        Alert.alert('Error', 'Please log in to save photos to storyboard');
+        return;
+      }
+
+      const parsedUserData = JSON.parse(userData);
+      const token = parsedUserData.token;
+
+      if (!token) {
+        Alert.alert('Error', 'Authentication token not found. Please log in again.');
+        return;
+      }
+
       const formData = new FormData();
       formData.append('image', {
         uri: capturedPhoto.uri,
@@ -366,6 +476,7 @@ export default function CameraZoom({ navigation }) {
         body: formData,
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -648,16 +759,25 @@ export default function CameraZoom({ navigation }) {
                         key={index}
                         style={[
                           styles.selectionItem,
-                          selectedFrame === index && styles.selectedItem
+                          selectedFrame === index && styles.selectedItem,
+                          frame.imageUrl ? styles.disabledSelectionItem : null
                         ]}
-                        onPress={() => setSelectedFrame(index)}
+                        onPress={() => !frame.imageUrl ? setSelectedFrame(index) : null}
+                        disabled={!!frame.imageUrl}
                       >
-                        <Text style={styles.selectionItemText}>
+                        <Text style={[
+                          styles.selectionItemText,
+                          frame.imageUrl ? styles.occupiedFrameText : null
+                        ]}>
                           Frame {index + 1} {frame.focalLength ? `(${frame.focalLength}mm)` : ''}
+                          {frame.imageUrl ? ' (Occupied)' : ''}
                         </Text>
                         {selectedFrame === index && (
                           <Icon name="check" size={16} color="#34C759" />
                         )}
+                        {frame.imageUrl ? (
+                          <Icon name="image" size={16} color="#FF9500" />
+                        ) : null}
                       </TouchableOpacity>
                     ))
                   ) : (
@@ -680,10 +800,10 @@ export default function CameraZoom({ navigation }) {
                 style={[
                   styles.storyboardActionButton, 
                   styles.saveButton,
-                  (!selectedFrame) && styles.disabledButton
+                  (selectedFrame === null || selectedFrame === undefined) && styles.disabledButton
                 ]}
                 onPress={saveToStoryboard}
-                disabled={!selectedFrame}
+                disabled={selectedFrame === null || selectedFrame === undefined}
               >
                 <Text style={styles.storyboardActionButtonText}>Save</Text>
               </TouchableOpacity>
@@ -1018,10 +1138,18 @@ const styles = StyleSheet.create({
   selectedItem: {
     backgroundColor: '#007AFF',
   },
+  disabledSelectionItem: {
+    backgroundColor: '#F0F0F0',
+    opacity: 0.6,
+  },
   selectionItemText: {
     fontSize: 14,
     color: 'black',
     flex: 1,
+  },
+  occupiedFrameText: {
+    color: '#FF9500',
+    fontStyle: 'italic',
   },
   storyboardActionButtons: {
     flexDirection: 'row',

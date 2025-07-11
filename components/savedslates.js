@@ -45,7 +45,7 @@ export default function SavedSlates({ navigation, route }) {
       setSlates(slatesData);
     } catch (error) {
       console.error('Error fetching slates:', error);
-      Alert.alert('Error', 'Failed to load slates');
+      // Don't show alert for fetch errors as they might be temporary
     } finally {
       setIsLoading(false);
     }
@@ -124,12 +124,14 @@ export default function SavedSlates({ navigation, route }) {
         <Text style={styles.slateTitle}>
           Roll: {item.roll} | Scene: {item.scene} | Take: {item.take}
         </Text>
-        <TouchableOpacity
-          onPress={() => handleDeleteSlate(item._id)}
-          style={styles.deleteButton}
-        >
-          <Ionicons name="trash-outline" size={24} color="#ff4444" />
-        </TouchableOpacity>
+        {!project.isShared && (
+          <TouchableOpacity
+            onPress={() => handleDeleteSlate(item._id)}
+            style={styles.deleteButton}
+          >
+            <Ionicons name="trash-outline" size={24} color="#ff4444" />
+          </TouchableOpacity>
+        )}
       </View>
       
       <View style={styles.slateDetails}>

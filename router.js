@@ -12,7 +12,7 @@ const fs = require('fs');
 const app = express();
 
 const PORT = 3001;
-const LOCAL_IP ="REPLACEWITHIP";
+const LOCAL_IP ="192.168.1.3";
 // const app = express();
 
 // Middleware to handle JSON and URL-encoded data
@@ -349,7 +349,7 @@ router.get('/scenes/:projectId', async (req, res) => {
 
     // Check if user owns the project or is a shared user
     const isOwner = project.user.toString() === decoded.userId;
-    const isSharedUser = project.sharedUsers.includes(decoded.userId);
+    const isSharedUser = project.sharedUsers.some(userId => userId.toString() === decoded.userId);
     
     if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Not authorized to access this project' });
@@ -379,10 +379,18 @@ router.post('/scenes', async (req, res) => {
       return res.status(400).json({ message: 'Title and projectId are required' });
     }
 
-    // Verify project belongs to user
-    const project = await Project.findOne({ _id: projectId, user: decoded.userId });
+    // Verify project belongs to user or is shared with user
+    const project = await Project.findById(projectId);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user owns the project or is a shared user
+    const isOwner = project.user.toString() === decoded.userId;
+    const isSharedUser = project.sharedUsers.some(userId => userId.toString() === decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
+      return res.status(403).json({ message: 'Not authorized to access this project' });
     }
 
     // Create new scene
@@ -425,7 +433,11 @@ router.put('/scenes/:sceneId/notes', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
-    if (scene.project.user.toString() !== decoded.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = scene.project.user.toString() === decoded.userId;
+    const isSharedUser = scene.project.sharedUsers.some(userId => userId.toString() === decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -481,7 +493,11 @@ router.put('/scenes/:sceneId/floorplan', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
-    if (scene.project.user.toString() !== decoded.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = scene.project.user.toString() === decoded.userId;
+    const isSharedUser = scene.project.sharedUsers.some(userId => userId.toString() === decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -516,8 +532,9 @@ router.delete('/scenes/:sceneId', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
+    // Only project owners can delete scenes
     if (scene.project.user.toString() !== decoded.userId) {
-      return res.status(403).json({ message: 'Unauthorized' });
+      return res.status(403).json({ message: 'Only project owners can delete scenes' });
     }
 
     // Remove scene from project's scenes array
@@ -599,7 +616,11 @@ router.post('/scenes/:sceneId/storyboard', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
-    if (scene.project.user.toString() !== decoded.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = scene.project.user.toString() === decoded.userId;
+    const isSharedUser = scene.project.sharedUsers.includes(decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -647,7 +668,11 @@ router.delete('/scenes/:sceneId/storyboard/:frameId', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
-    if (scene.project.user.toString() !== decoded.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = scene.project.user.toString() === decoded.userId;
+    const isSharedUser = scene.project.sharedUsers.includes(decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -668,6 +693,8 @@ router.delete('/scenes/:sceneId/storyboard/:frameId', async (req, res) => {
     res.status(500).json({ message: 'Error deleting storyboard frame', error: error.message });
   }
 });
+
+
 
 // Batch create storyboard frames
 router.post('/scenes/:sceneId/storyboard/batch', async (req, res) => {
@@ -691,7 +718,11 @@ router.post('/scenes/:sceneId/storyboard/batch', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
-    if (scene.project.user.toString() !== decoded.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = scene.project.user.toString() === decoded.userId;
+    const isSharedUser = scene.project.sharedUsers.includes(decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -818,7 +849,11 @@ router.post('/scenes/:sceneId/storyboard/:frameId/image',
 
       console.log('Scene found:', scene.title);
 
-      if (scene.project.user.toString() !== req.userId) {
+      // Check if user owns the project or is a shared user
+      const isOwner = scene.project.user.toString() === req.userId;
+      const isSharedUser = scene.project.sharedUsers.some(userId => userId.toString() === req.userId);
+      
+      if (!isOwner && !isSharedUser) {
         console.log('Unauthorized access');
         return res.status(403).json({ message: 'Unauthorized' });
       }
@@ -908,15 +943,18 @@ router.post('/scenes/:sceneId/storyboard/frames/:frameIndex/image',
         try {
           decoded = jwt.verify(token, 'your-secret-key');
           const isOwner = project.user.toString() === decoded.userId;
-          const isSharedUser = project.sharedUsers.includes(decoded.userId);
+          const isSharedUser = project.sharedUsers.some(userId => userId.toString() === decoded.userId);
           
           if (!isOwner && !isSharedUser) {
             console.log('User not authorized to access this project');
             return res.status(403).json({ message: 'Not authorized to modify this project' });
           }
         } catch (error) {
-          console.log('Token verification failed, proceeding without auth check');
+          console.log('Token verification failed:', error);
+          return res.status(401).json({ message: 'Invalid authentication token' });
         }
+      } else {
+        return res.status(401).json({ message: 'Authentication token required' });
       }
 
       // Check if frame index is valid
@@ -961,8 +999,11 @@ router.get('/projects/:projectId/script', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Verify project belongs to user
-    if (project.user.toString() !== req.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = project.user.toString() === req.userId;
+    const isSharedUser = project.sharedUsers.includes(req.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -980,9 +1021,9 @@ router.post('/projects/:projectId/script', verifyToken, upload.single('script'),
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Verify project belongs to user
+    // Only project owners can upload scripts
     if (project.user.toString() !== req.userId) {
-      return res.status(403).json({ message: 'Not authorized' });
+      return res.status(403).json({ message: 'Only project owners can upload scripts' });
     }
 
     if (!req.file) {
@@ -1003,13 +1044,14 @@ router.post('/projects/:projectId/script', verifyToken, upload.single('script'),
 // Delete script
 router.delete('/projects/:projectId/script', verifyToken, async (req, res) => {
   try {
-    const project = await Project.findOne({
-      _id: req.params.projectId,
-      userId: req.userId
-    });
-
+    const project = await Project.findById(req.params.projectId);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Only project owners can delete scripts
+    if (project.user.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Only project owners can delete scripts' });
     }
 
     if (project.scriptUrl) {
@@ -1044,8 +1086,11 @@ router.post('/projects/:projectId/slates', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Check if user owns the project
-    if (project.user.toString() !== req.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = project.user.toString() === req.userId;
+    const isSharedUser = project.sharedUsers.includes(req.userId);
+    
+    if (!isOwner && !isSharedUser) {
       console.log('Unauthorized access attempt');
       return res.status(403).json({ message: 'Not authorized to add slates to this project' });
     }
@@ -1083,8 +1128,11 @@ router.get('/projects/:projectId/slates', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Check if user owns the project
-    if (project.user.toString() !== req.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = project.user.toString() === req.userId;
+    const isSharedUser = project.sharedUsers.includes(req.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Not authorized to view slates for this project' });
     }
 
@@ -1140,7 +1188,11 @@ router.put('/scenes/:sceneId', async (req, res) => {
       return res.status(404).json({ message: 'Scene not found' });
     }
 
-    if (scene.project.user.toString() !== decoded.userId) {
+    // Check if user owns the project or is a shared user
+    const isOwner = scene.project.user.toString() === decoded.userId;
+    const isSharedUser = scene.project.sharedUsers.includes(decoded.userId);
+    
+    if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 

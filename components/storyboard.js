@@ -34,6 +34,15 @@ export default function StoryboardScreen({ navigation, route }) {
     fetchFrames();
   }, []);
 
+  // Refresh frames when component comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchFrames();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const fetchFrames = async () => {
     try {
       setIsLoading(true);
@@ -50,12 +59,12 @@ export default function StoryboardScreen({ navigation, route }) {
       });
       
       console.log('Frames response:', response.data);
-      if (response.data && Array.isArray(response.data)) {
+      if (response.data && response.data.frames && Array.isArray(response.data.frames)) {
         // Ensure we never have more than 30 frames
-        const validFrames = response.data.slice(0, 30);
+        const validFrames = response.data.frames.slice(0, 30);
         
-        if (validFrames.length !== response.data.length) {
-          console.warn(`Truncated frames from ${response.data.length} to ${validFrames.length}`);
+        if (validFrames.length !== response.data.frames.length) {
+          console.warn(`Truncated frames from ${response.data.frames.length} to ${validFrames.length}`);
           // Update the database to reflect the correct number of frames
           await axios.put(
             `${API_BASE_URL}/scenes/${scene._id}`,
@@ -69,8 +78,29 @@ export default function StoryboardScreen({ navigation, route }) {
           );
         }
         
-        setFrames(validFrames);
-        setFrameCount(validFrames.length);
+        // Ensure frame numbers are consistent
+        const reorderedFrames = validFrames.map((frame, index) => ({
+          ...frame,
+          frameNumber: index + 1,
+          title: `Frame ${index + 1}`
+        }));
+        
+        // Update the database with reordered frames if they were different
+        if (JSON.stringify(reorderedFrames) !== JSON.stringify(validFrames)) {
+          await axios.put(
+            `${API_BASE_URL}/scenes/${scene._id}`,
+            { storyboard: reorderedFrames },
+            {
+              headers: {
+                Authorization: `Bearer ${project.userData.token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+        
+        setFrames(reorderedFrames);
+        setFrameCount(reorderedFrames.length);
       } else {
         setFrames([]);
         setFrameCount(0);
@@ -84,6 +114,47 @@ export default function StoryboardScreen({ navigation, route }) {
       setFrameCount(0);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const createSingleFrame = async () => {
+    try {
+      console.log('Creating single frame');
+      
+      // Calculate the next frame number based on existing frames
+      const nextFrameNumber = frames.length > 0 
+        ? Math.max(...frames.map(f => f.frameNumber || 0)) + 1 
+        : 1;
+      
+      const newFrameData = {
+        title: `Frame ${nextFrameNumber}`,
+        description: '',
+        shotType: 'WIDE',
+        cameraMovement: 'STATIC',
+        frameNumber: nextFrameNumber
+      };
+
+      const response = await axios.post(
+        `${API_BASE_URL}/scenes/${scene._id}/storyboard`,
+        newFrameData,
+        {
+          headers: {
+            Authorization: `Bearer ${project.userData.token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('New frame created:', response.data);
+      
+      // Add the new frame to the local state
+      setFrames(prev => [...prev, response.data]);
+      setFrameCount(prev => prev + 1);
+      
+      Alert.alert('Success', 'Frame created successfully!');
+    } catch (error) {
+      console.error('Error creating frame:', error);
+      Alert.alert('Error', 'Failed to create frame. Please try again.');
     }
   };
 
@@ -331,12 +402,76 @@ export default function StoryboardScreen({ navigation, route }) {
     );
   };
 
+  const deleteFrame = async (frameId) => {
+    Alert.alert(
+      'Delete Frame',
+      'Are you sure you want to delete this frame?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await axios.delete(
+                `${API_BASE_URL}/scenes/${scene._id}/storyboard/${frameId}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${project.userData.token}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+
+              // Remove frame from local state and reorder frame numbers
+              const updatedFrames = frames
+                .filter(frame => frame._id !== frameId)
+                .map((frame, index) => ({
+                  ...frame,
+                  frameNumber: index + 1,
+                  title: `Frame ${index + 1}`
+                }));
+
+              // Update the scene with reordered frames
+              await axios.put(
+                `${API_BASE_URL}/scenes/${scene._id}`,
+                { storyboard: updatedFrames },
+                {
+                  headers: {
+                    Authorization: `Bearer ${project.userData.token}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+
+              setFrames(updatedFrames);
+              setFrameCount(updatedFrames.length);
+              
+              Alert.alert('Success', 'Frame deleted successfully!');
+            } catch (error) {
+              console.error('Error deleting frame:', error);
+              Alert.alert('Error', 'Failed to delete frame');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderFrame = (frame, index) => (
     <View key={frame._id} style={styles.frameContainer}>
-      <Text style={styles.frameNumber}>
-        {frame.frameNumber || index + 1}
-        {frame.focalLength && ` (${frame.focalLength}mm)`}
-      </Text>
+      <View style={styles.frameHeader}>
+        <Text style={styles.frameNumber}>
+          Frame {frame.frameNumber || index + 1}
+          {frame.focalLength && ` (${frame.focalLength}mm)`}
+        </Text>
+        <TouchableOpacity 
+          style={styles.deleteFrameButton}
+          onPress={() => deleteFrame(frame._id)}
+        >
+          <Icon name="trash" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
       
       <View style={styles.imageContainer}>
         {frame.imageUrl ? (
@@ -378,13 +513,23 @@ export default function StoryboardScreen({ navigation, route }) {
           {scene.title} – Storyboard
         </Text>
         
-        <TouchableOpacity 
-          style={styles.dropdownButton}
-          onPress={() => setShowDropdown(true)}
-        >
-          <Text style={styles.dropdownText}>{frameCount} Frames</Text>
-          <Icon name="chevron-down" size={16} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={styles.addFrameButton}
+            onPress={createSingleFrame}
+          >
+            <Icon name="plus" size={16} color="#fff" />
+            <Text style={styles.addFrameButtonText}>Add Frame</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.dropdownButton}
+            onPress={() => setShowDropdown(true)}
+          >
+            <Text style={styles.dropdownText}>{frameCount} Frames</Text>
+            <Icon name="chevron-down" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -512,13 +657,15 @@ export default function StoryboardScreen({ navigation, route }) {
                 <Icon name="arrow-left" size={20} color="#fff" />
                 <Text style={styles.actionButtonText}>Back</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={deletePhoto}
-              >
-                <Icon name="trash" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Delete</Text>
-              </TouchableOpacity>
+              {!project.isShared && (
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={deletePhoto}
+                >
+                  <Icon name="trash" size={20} color="#fff" />
+                  <Text style={styles.actionButtonText}>Delete</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -549,11 +696,30 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 20,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   title: {
     color: '#fff',
     fontSize: 26,
     fontWeight: 'bold',
     flex: 1,
+  },
+  addFrameButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  addFrameButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   dropdownButton: {
     backgroundColor: '#fff',
@@ -588,14 +754,25 @@ const styles = StyleSheet.create({
     height: 120,
     position: 'relative',
   },
+  frameHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    zIndex: 1,
+  },
   frameNumber: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 1,
+  },
+  deleteFrameButton: {
+    backgroundColor: '#FF3B30',
+    padding: 6,
+    borderRadius: 4,
   },
   modalOverlay: {
     flex: 1,

@@ -126,10 +126,8 @@ const Floorplan = ({ navigation, route }) => {
       setCurrentScene(response.data);
     } catch (error) {
       console.error('Error fetching scene data:', error);
-      Alert.alert(
-        'Error',
-        'Failed to load floorplan data. Please try again.'
-      );
+      // Don't show alert for fetch errors as they might be temporary
+      // The component will still work with the initial scene data
     }
   };
 
