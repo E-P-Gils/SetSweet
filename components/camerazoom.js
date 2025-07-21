@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useState, useRef } from 'react';
-import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image, Modal, Dimensions, Alert } from 'react-native'; 
+import { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, Button, TouchableOpacity, ScrollView, Image, Modal, Dimensions, Alert, Platform } from 'react-native'; 
 import { PinchGestureHandler } from 'react-native-gesture-handler'; 
 import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
 import Icon from 'react-native-vector-icons/FontAwesome'; 
@@ -10,10 +10,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CameraZoom({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
-  const [zoom, setZoom] = useState(0); 
+  const [zoom, setZoom] = useState(-1); // Start with a very small positive zoom to get wider view (18mm equivalent)
   const [scale, setScale] = useState(1); 
   const [showDropdown, setShowDropdown] = useState(false); 
-  const [selectedFocalLength, setSelectedFocalLength] = useState(18); 
+  const [selectedFocalLength, setSelectedFocalLength] = useState(30); 
   const [showGrid, setShowGrid] = useState(false); 
   const [aspectRatio, setAspectRatio] = useState('16:9');  
   const [showBorder, setShowBorder] = useState(false); 
@@ -29,8 +29,29 @@ export default function CameraZoom({ navigation }) {
   const [selectedScene, setSelectedScene] = useState(null);
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [currentMenuLayer, setCurrentMenuLayer] = useState('project'); // 'project', 'scene', 'frame'
+  const [cameraError, setCameraError] = useState(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const cameraRef = useRef(null);
+
+  // iOS-specific camera error handling
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      // Add iOS-specific camera initialization
+      console.log('iOS camera component initialized');
+      // Set a timeout to mark camera as ready after initialization
+      const timer = setTimeout(() => {
+        console.log('Camera timeout reached, marking as ready');
+        setCameraReady(true);
+        console.log('Camera marked as ready');
+      }, 2000); // Increased to 2 seconds for iOS camera initialization
+      
+      return () => clearTimeout(timer);
+    } else {
+      console.log('Android camera component initialized');
+      setCameraReady(true);
+    }
+  }, []);
 
   const { width, height } = Dimensions.get('window');
   
@@ -48,6 +69,13 @@ export default function CameraZoom({ navigation }) {
   // Calculate overlay dimensions to center the viewfinder
   const overlayTop = (height - viewfinderHeight) / 2;
   const overlayLeft = (width - viewfinderWidth) / 2;
+
+  // Handle camera errors
+  const handleCameraError = (error) => {
+    console.error('Camera error:', error);
+    setCameraError(error.message || 'Camera error occurred');
+    Alert.alert('Camera Error', 'There was an issue with the camera. Please try again.');
+  };
 
   if (!permission) return <View />;
   if (!permission.granted) {
@@ -75,6 +103,19 @@ export default function CameraZoom({ navigation }) {
           </View>
         </View>
       </Modal>
+    );
+  }
+
+  // Show error state if camera fails
+  if (cameraError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Icon name="exclamation-triangle" size={50} color="#FF3B30" />       <Text style={styles.errorText}>Camera Error</Text>
+        <Text style={styles.errorSubtext}>{cameraError}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => setCameraError(null)}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -119,7 +160,13 @@ export default function CameraZoom({ navigation }) {
   };
 
   const toggleViewfinderRatio = () => {
-    setViewfinderRatio(viewfinderRatio === '3:4' ? '16:9' : '3:4');
+    try {
+      console.log('Toggling viewfinder ratio. Current:', viewfinderRatio);
+      setViewfinderRatio(viewfinderRatio === '3:4' ? '16:9' : '3:4');
+    } catch (error) {
+      console.error('Error toggling viewfinder ratio:', error);
+      handleCameraError(error);
+    }
   };
 
   const takePicture = async () => {
@@ -494,15 +541,91 @@ export default function CameraZoom({ navigation }) {
     }
   };
 
+  // Add logging and error boundary around the overlay rendering
+  let overlayContent = null;
+  try {
+    // Only render overlay if camera is ready
+    if (cameraReady) {
+      console.log('Camera is ready, rendering overlay');
+      console.log('Overlay dimensions:', {
+        viewfinderWidth,
+        viewfinderHeight,
+        overlayTop,
+        overlayLeft,
+        width,
+        height,
+      });
+      
+      // Validate dimensions before rendering
+      if (viewfinderWidth > 0 && viewfinderHeight > 0 && overlayTop >= 0 && overlayLeft >= 0) {
+        console.log('Dimensions valid, creating overlay content');
+        overlayContent = (
+          <View style={styles.viewfinderOverlay}>
+            {/* Top overlay */}
+            <View style={[styles.overlayBar, { 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: overlayTop 
+            }]} />
+            {/* Left overlay */}
+            <View style={[styles.overlayBar, { 
+              top: overlayTop, 
+              left: 0, 
+              width: overlayLeft, 
+              height: viewfinderHeight 
+            }]} />
+            {/* Right overlay */}
+            <View style={[styles.overlayBar, { 
+              top: overlayTop, 
+              left: overlayLeft + viewfinderWidth, 
+              width: overlayLeft, 
+              height: viewfinderHeight 
+            }]} />
+            {/* Bottom overlay */}
+            <View style={[styles.overlayBar, { 
+              top: overlayTop + viewfinderHeight, 
+              left: 0, 
+              width: '100%', 
+              height: height + 100
+            }]} />
+          </View>
+        );
+        console.log('Overlay content created successfully');
+      } else {
+        console.log('Invalid overlay dimensions, skipping overlay render');
+      }
+    } else {
+      console.log('Camera not ready or iOS validation failed, skipping overlay render');
+    }
+  } catch (error) {
+    console.error('Error rendering overlay:', error);
+    // Don't call handleCameraError for overlay errors on iOS to prevent crashes
+    if (Platform.OS !== 'ios') {
+      handleCameraError(error);
+    }
+  }
+
+  // Add camera ready handler
+  const handleCameraReady = () => {
+    console.log('Camera ready event fired');
+    setCameraReady(true);
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <PinchGestureHandler onGestureEvent={(event) => {
-        // Use a more responsive scaling factor for pinch gestures
-        let newZoom = zoom + (event.nativeEvent.scale - 1) * 0.1; 
-        newZoom = Math.max(0, Math.min(newZoom, 1)); 
-        setZoom(newZoom);
-        setScale(event.nativeEvent.scale); 
-        setSelectedFocalLength(calculateFocalLength(newZoom)); 
+        try {
+          // Use a more responsive scaling factor for pinch gestures
+          let newZoom = zoom + (event.nativeEvent.scale - 1) * 0.1; 
+          newZoom = Math.max(0, Math.min(newZoom, 1)); 
+          setZoom(newZoom);
+          setScale(event.nativeEvent.scale); 
+          setSelectedFocalLength(calculateFocalLength(newZoom)); 
+        } catch (error) {
+          console.error('Pinch gesture error:', error);
+          handleCameraError(error);
+        }
       }} >
         <View style={styles.cameraContainer}>
           <CameraView 
@@ -515,44 +638,25 @@ export default function CameraZoom({ navigation }) {
             autoFocus={false}
             focusDistance={1.0}
             enablePinchToZoom={false}
+            onCameraError={handleCameraError}
+            onCameraReady={handleCameraReady}
+            // iOS-specific props to prevent crashes
+            {...(Platform.OS === 'ios' && {
+              videoStabilizationMode: 'off',
+              preset: 'photo',
+              whiteBalance: 'auto',
+              exposure: 0,
+              iso: 0,
+              enableAutoFocus: false,
+              enableAutoZoom: false,
+              enablePinchToZoom: false,
+            })}
           >
             {/* Film Camera Viewfinder Overlay */}
-            <View style={styles.viewfinderOverlay}>
-              {/* Top overlay */}
-              <View style={[styles.overlayBar, { 
-                top: 0, 
-                left: 0, 
-                width: '100%', 
-                height: overlayTop 
-              }]} />
-              
-              {/* Left overlay */}
-              <View style={[styles.overlayBar, { 
-                top: overlayTop, 
-                left: 0, 
-                width: overlayLeft, 
-                height: viewfinderHeight 
-              }]} />
-              
-              {/* Right overlay */}
-              <View style={[styles.overlayBar, { 
-                top: overlayTop, 
-                left: overlayLeft + viewfinderWidth, 
-                width: overlayLeft, 
-                height: viewfinderHeight 
-              }]} />
-              
-              {/* Bottom overlay */}
-              <View style={[styles.overlayBar, { 
-                top: overlayTop + viewfinderHeight, 
-                left: 0, 
-                width: '100%', 
-                height: height + 100 
-              }]} />
-            </View>
+            {cameraReady && overlayContent}
 
             {/* Border with Aspect Ratio Text when activated */}
-            {showBorder && (
+            {showBorder && cameraReady && (
               <View style={[styles.aspectRatioBorder]} />
             )}
 
@@ -576,9 +680,44 @@ export default function CameraZoom({ navigation }) {
       </TouchableOpacity>
 
       {/* Viewfinder Toggle Button */}
-      <TouchableOpacity style={[styles.viewfinderButton, { left: width * 0.835 }, { top: height * 0.83 }]} onPress={toggleViewfinderRatio}>
-        <Text style={styles.viewfinderButtonText}>{viewfinderRatio}</Text>
+      <TouchableOpacity 
+        style={[styles.viewfinderButton, { left: width * 0.835, top: height * 0.83 }]} 
+        onPress={() => {
+          try {
+            if (!cameraReady) {
+              console.log('Camera not ready, ignoring viewfinder toggle');
+              if (Platform.OS === 'ios') {
+                // On iOS, just ignore the press instead of showing alert
+                return;
+              }
+              Alert.alert('Camera Loading', 'Please wait for the camera to finish loading.');
+              return;
+            }
+            console.log('Viewfinder toggle button pressed');
+            console.log('Current viewfinderRatio:', viewfinderRatio);
+            console.log('Current aspectRatio:', aspectRatio);
+            console.log('Current showBorder:', showBorder);
+            toggleViewfinderRatio();
+            console.log('Viewfinder toggle completed');
+          } catch (error) {
+            console.error('Error in viewfinder toggle button press:', error);
+            // Don't call handleCameraError on iOS to prevent crashes
+            if (Platform.OS !== 'ios') {
+              handleCameraError(error);
+            }
+          }
+        }}
+        disabled={!cameraReady}
+      >
+        <Text style={[styles.viewfinderButtonText, !cameraReady && styles.disabledText]}>{viewfinderRatio}</Text>
       </TouchableOpacity>
+
+      {/* Camera Loading Indicator */}
+      {!cameraReady && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Camera Loading...</Text>
+        </View>
+      )}
 
       <TouchableOpacity style={[styles.gridButton, { left: width * 0.85 }, { top: height * 0.92 }]} onPress={() => setShowGrid(!showGrid)}>
         <Text style={styles.gridButtonText}>3x3</Text>
@@ -587,7 +726,7 @@ export default function CameraZoom({ navigation }) {
       {showDropdown && (
         <View style={[styles.dropdown, { left: width * 0.18, top: -110 }]} >
           <ScrollView contentContainerStyle={styles.dropdownContent}>
-            {Array.from({ length: 183 }, (_, i) => i + 18).map((value) => (
+            {Array.from({ length: 171 }, (_, i) => i + 30).map((value) => (
               <TouchableOpacity 
                 key={value} 
                 style={styles.dropdownItem} 
@@ -1192,5 +1331,55 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     padding: 20,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF3B30',
+    marginBottom: 10,
+  },
+  errorSubtext: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  disabledText: {
+    color: '#CCCCCC',
   },
 });

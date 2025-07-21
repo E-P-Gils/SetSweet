@@ -27,8 +27,8 @@ const scale = getResponsiveScale();
 // Helper function to scale dimensions
 const scaledSize = (size) => size * scale;
 
-const colorBars = ['#000', '#4a4a4a', '#a0a0a0', '#ffffff', '#e30613', '#0072ce', '#00a94f', '#f7ec13'];
-const topClapperColors = ['#f7ec13', '#00a94f', '#0072ce', '#e30613', '#ffffff', '#a0a0a0', '#4a4a4a', '#000'];
+const colorBars = ['#FF0000', '#FFFF00', '#00FF00', '#0000FF', '#FF0000', '#FFFF00', '#00FF00', '#0000FF'];
+const topClapperColors = ['#0000FF', '#00FF00', '#FFFF00', '#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF0000'];
 
 const VerticalLabel = ({ label }) => (
   <View style={styles.verticalBox}>
@@ -49,6 +49,8 @@ const SlateInput = ({ placeholder, big, style, value, onChangeText, ...props }) 
 
 export default function DigitalSlate({ navigation, route }) {
   const clapAnim = useRef(new Animated.Value(0)).current;
+  const topClapperAnim = useRef(new Animated.Value(-screenHeight)).current;
+  const bottomClapperAnim = useRef(new Animated.Value(screenHeight)).current;
   const soundRef = useRef(null);
   
   // State for responsive scaling
@@ -154,6 +156,65 @@ export default function DigitalSlate({ navigation, route }) {
       Animated.timing(clapAnim, { toValue: 0, duration: 100, useNativeDriver: true })
     ]).start();
   };
+
+  const handleSlateButton = async () => {
+    // Reset clappers to off-screen positions
+    topClapperAnim.setValue(-screenHeight);
+    bottomClapperAnim.setValue(screenHeight);
+
+    // Use device-specific offset based on screen size
+    const isLargeScreen = screenHeight > 800; // Detect larger screens (Android tablets, etc.)
+    const animationOffset = isLargeScreen ? 40 : 15; // Larger offset for big screens, smaller for phones
+    
+    // Animate clappers coming from top and bottom
+    Animated.parallel([
+      Animated.timing(topClapperAnim, {
+        toValue: animationOffset,
+        duration: 500,
+        useNativeDriver: true
+      }),
+      Animated.timing(bottomClapperAnim, {
+        toValue: -animationOffset,
+        duration: 500,
+        useNativeDriver: true
+      })
+    ]).start(async () => {
+      // After clappers meet, retreat back off-screen
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(topClapperAnim, {
+            toValue: -screenHeight,
+            duration: 500,
+            useNativeDriver: true
+          }),
+          Animated.timing(bottomClapperAnim, {
+            toValue: screenHeight,
+            duration: 500,
+            useNativeDriver: true
+          })
+        ]).start();
+      }, 300); // Hold for 300ms before retreating
+    });
+
+    // Play sound just before clappers meet
+    setTimeout(async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          require('../assets/slateclapper.mp3')
+        );
+        await sound.playAsync();
+        
+        // Set up a listener to unload the sound after it finishes playing
+        sound.setOnPlaybackStatusUpdate(async (status) => {
+          if (status.didJustFinish) {
+            await sound.unloadAsync();
+          }
+        });
+      } catch (error) {
+        console.error('Error playing clap sound:', error);
+      }
+    }, 315); // Play sound 185ms before clappers meet (at 315ms instead of 500ms)
+  };
   
   
   const toggleSelection = (toggleCategory) => {
@@ -178,10 +239,9 @@ export default function DigitalSlate({ navigation, route }) {
         return;
       }
 
-      const parsedUserData = JSON.parse(userData);
       const response = await fetch(`${API_BASE_URL}/projects`, {
         headers: {
-          'Authorization': `Bearer ${parsedUserData.token}`
+          'Authorization': `Bearer ${JSON.parse(userData).token}`
         }
       });
 
@@ -305,35 +365,36 @@ export default function DigitalSlate({ navigation, route }) {
 
   return (
     <View style={styles.wrapper}>
-      <TouchableWithoutFeedback onPress={handleClap}>
-        <View style={styles.clapperContainer}>
-          {/* Top clapper arm (animated) */}
-          <Animated.View 
-            style={[
-              styles.clapperArm, 
-              styles.topClapper,
-              {
-                transform: [{
-                  translateY: clapAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-60, 30]
-                  })
-                }]
-              }
-            ]}>
-            {topClapperColors.map((color, index) => (
-              <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
-            ))}
-          </Animated.View>
-          
-          {/* Bottom clapper arm (stationary) */}
-          <View style={[styles.clapperArm, styles.bottomClapper]}>
-            {colorBars.map((color, index) => (
-              <View key={index} style={[styles.colorBar, { backgroundColor: color }]} />
-            ))}
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
+      {/* Full screen clappers for slate animation */}
+      <Animated.View 
+        style={[
+          styles.fullScreenTopClapper,
+          {
+            transform: [{
+              translateY: topClapperAnim
+            }]
+          }
+        ]}>
+        {topClapperColors.map((color, index) => (
+          <View key={index} style={[styles.fullScreenColorBar, { backgroundColor: color }]} />
+        ))}
+      </Animated.View>
+      
+      <Animated.View 
+        style={[
+          styles.fullScreenBottomClapper,
+          {
+            transform: [{
+              translateY: bottomClapperAnim
+            }]
+          }
+        ]}>
+        {colorBars.map((color, index) => (
+          <View key={index} style={[styles.fullScreenColorBar, { backgroundColor: color }]} />
+        ))}
+      </Animated.View>
+
+
 
       <View style={styles.topTriplet}>
         <View style={styles.tripletBox}>
@@ -446,6 +507,9 @@ export default function DigitalSlate({ navigation, route }) {
                 <Ionicons name="save" size={24} color="#000" />
               </TouchableOpacity>
             )}
+            <TouchableOpacity style={styles.slateButton} onPress={handleSlateButton}>
+              <Text style={styles.slateButtonText}>SLATE</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -546,41 +610,33 @@ export default function DigitalSlate({ navigation, route }) {
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
-    marginTop: scaledSize(20),
+    justifyContent: 'center',
+    flex: 1,
     transform: [{ rotate: '90deg' }],
   },
-  clapperContainer: {
-    position: 'relative',
-    width: scaledSize(950),
-    height: scaledSize(40),
-    marginBottom: scaledSize(5),
-    left: scaledSize(255),
-    top: scaledSize(-20),
-  },
-  clapperArm: {
+  fullScreenTopClapper: {
+    position: 'absolute',
+    top: 0,
+    left: -screenWidth * 2,
+    right: -screenWidth * 2,
+    height: screenHeight / 2,
     flexDirection: 'row',
-    width: scaledSize(950),
-    height: scaledSize(30),
-    justifyContent: 'space-between',
-    borderTopLeftRadius: scaledSize(5),
-    borderTopRightRadius: scaledSize(5),
-    overflow: 'hidden',
-    elevation: 3,
+    zIndex: 1000,
+    width: screenWidth * 5,
+    alignSelf: 'center',
   },
-  topClapper: {
+  fullScreenBottomClapper: {
     position: 'absolute',
-    top: scaledSize(-60),
-    height: scaledSize(60),
+    bottom: 0,
+    left: -screenWidth * 2,
+    right: -screenWidth * 2,
+    height: screenHeight / 2,
+    flexDirection: 'row',
+    zIndex: 1000,
+    width: screenWidth * 5,
+    alignSelf: 'center',
   },
-  bottomClapper: {
-    position: 'absolute',
-    top: scaledSize(30),
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    borderBottomLeftRadius: scaledSize(5),
-    borderBottomRightRadius: scaledSize(5),
-  },
-  colorBar: {
+  fullScreenColorBar: {
     flex: 1,
     height: '100%',
   },
@@ -591,7 +647,6 @@ const styles = StyleSheet.create({
     padding: scaledSize(10),
     width: scaledSize(750),
     alignSelf: 'center',
-    left: scaledSize(235),
   },
   row: {
     flexDirection: 'row',
@@ -606,8 +661,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: scaledSize(10),
-    position: 'relative',
-    left: scaledSize(235), 
     width: scaledSize(750), 
   },
   tripletBox: {
@@ -655,6 +708,7 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   button: {
     backgroundColor: '#fff',
@@ -666,6 +720,21 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginLeft: scaledSize(10),
+  },
+  slateButton: {
+    backgroundColor: '#fff',
+    borderColor: '#000',
+    borderWidth: scaledSize(2),
+    paddingVertical: scaledSize(12),
+    paddingHorizontal: scaledSize(20),
+    borderRadius: scaledSize(5),
+    marginHorizontal: scaledSize(10),
+  },
+  slateButtonText: {
+    color: '#000',
+    fontSize: scaledSize(16),
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   toggleButton: {
     backgroundColor: '#fff',
